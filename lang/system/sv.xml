@@ -884,42 +884,42 @@ Are you sure you want to continue?</user_delete_warn>
 		<automatic_user_login>Automatic User Login</automatic_user_login>
 	</user_management>
 
-	<vita3k_update name="Vita3K Update">
-		<new_version_available>A new version of Vita3K is available.</new_version_available>
-		<back>Back</back>
-		<cancel_update_resume>Do you want to cancel the update?
+	<vita3k_update name="Uppdatera Vita3K">
+		<new_version_available>En ny version av Vita3K finns tillgänglig.</new_version_available>
+		<back>Bakåt</back>
+		<cancel_update_resume>Vill du avbryta uppdateringen?
 If you cancel, the next time you update, Vita3K will start downloading from this point.</cancel_update_resume>
-		<downloading>Downloading...
+		<downloading>Hämtar...
 After the download is complete, Vita3K will restart automatically and then install the new update.</downloading>
 		<not_complete_update>Could not complete the update.</not_complete_update>
-		<minutes_left>{} Minutes Left</minutes_left>
-		<next>Next</next>
-		<seconds_left>{} Seconds Left</seconds_left>
-		<update_vita3k>Do you want to update Vita3K?</update_vita3k>
+		<minutes_left>{} minuter kvar</minutes_left>
+		<next>Nästa</next>
+		<seconds_left>{} sekunder kvar</seconds_left>
+		<update_vita3k>Vill du uppdatera Vita3K?</update_vita3k>
 		<later_version_already_installed>The later version of Vita3K is already installed.</later_version_already_installed>
 		<latest_version_already_installed>The latest version of Vita3K is already installed.</latest_version_already_installed>
-		<new_features>New Features in Version {}</new_features>
-		<authors>Authors</authors>
-		<comments>Comments</comments>
+		<new_features>Nya funktioner i version {}</new_features>
+		<authors>Upphovspersoner</authors>
+		<comments>Kommentarer</comments>
 		<update>Update</update>
 		<version>Version {}</version>
 	</vita3k_update>
 
-	<welcome name="Welcome to Vita3K">
+	<welcome name="Välkommen till Vita3K">
 		<vita3k>Vita3K PlayStation Vita Emulator</vita3k>
-		<about_vita3k>Vita3K is an open-source PlayStation Vita emulator written in C++ for Windows, Linux, macOS and Android.</about_vita3k>
-		<development_stage>The emulator is still in its development stages so any feedback and testing is greatly appreciated.</development_stage>
-		<about_firmware>To get started, please install the PS Vita firmware and font packages.</about_firmware>
-		<download_firmware>Download Firmware</download_firmware>
-		<vita3k_quickstart>A comprehensive guide on how to set-up Vita3K can be found on the</vita3k_quickstart>
-		<quickstart>Quickstart</quickstart>
-		<page>page.</page>
-		<check_compatibility>Consult the Commercial game and the Homebrew compatibility list to see what currently runs.</check_compatibility>
-		<commercial_compatibility_list>Commercial Compatibility List</commercial_compatibility_list>
-		<homebrew_compatibility_list>Homebrew Compatibility List</homebrew_compatibility_list>
-		<welcome_contribution>Contributions are welcome!</welcome_contribution>
-		<discord_help>Additional support can be found in the #help channel of the</discord_help>
-		<no_piracy>Vita3K does not condone piracy. You must dump your own games.</no_piracy>
-		<show_next_time>Show next time</show_next_time>
+		<about_vita3k>Vita3K är en PlayStation Vita-emulator skriven i C++ baserad på öppen källkod för Windows, Linux, macOS samt Android.</about_vita3k>
+		<development_stage>Emulatorn är fortfarande i sina utvecklingssteg så all återkoppling och tester uppskattas mycket.</development_stage>
+		<about_firmware>Installera PS Vita-firmware och typsnittspaketen för att komma igång.</about_firmware>
+		<download_firmware>Hämta firmware</download_firmware>
+		<vita3k_quickstart>En omfattande guide för hur man konfigurerar Vita3K kan hittas på</vita3k_quickstart>
+		<quickstart>Snabbstart</quickstart>
+		<page>-sidan.</page>
+		<check_compatibility>Konsultera kompatibilitetslistan för kommersiella spel och homebrew för att se vad som fungerar att köra.</check_compatibility>
+		<commercial_compatibility_list>Kompatibilitetslista för kommersiella</commercial_compatibility_list>
+		<homebrew_compatibility_list>Kompatibilitetslista för homebrew</homebrew_compatibility_list>
+		<welcome_contribution>Bidrag och hjälp välkomnas!</welcome_contribution>
+		<discord_help>Ytterligare support kan hittas i kanalen #help på</discord_help>
+		<no_piracy>Vita3K uppmuntrar inte till piratkopiering. Du måste dumpa dina egna spel som du äger.</no_piracy>
+		<show_next_time>Visa nästa gång</show_next_time>
 	</welcome>
 </lang>
