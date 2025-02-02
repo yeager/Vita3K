@@ -4,7 +4,7 @@
 	<main_menubar>
 		<file name="Arkiv">
 			<open_pref_path>Öppna inställningssökväg</open_pref_path>
-			<open_textures_path>Open Textures Path</open_textures_path>
+			<open_textures_path>Öppna textursökväg</open_textures_path>
 			<install_firmware>Installera firmware</install_firmware>
 			<install_pkg>Installera .pkg</install_pkg>
 			<install_zip>Installera .zip, .vpk</install_zip>
@@ -14,15 +14,15 @@
 		<emulation name="Emulering">
 			<last_apps_used>Senaste använda program</last_apps_used>
 		</emulation>
-		<debug name="Debug">
-			<threads>Threads</threads>
-			<semaphores>Semaphores</semaphores>
-			<mutexes>Mutexes</mutexes>
-			<lightweight_mutexes>Lightweight Mutexes</lightweight_mutexes>
-			<condition_variables>Condition Variables</condition_variables>
-			<lightweight_condition_variables>Lightweight Condition Variables</lightweight_condition_variables>
-			<event_flags>Event Flags</event_flags>
-			<memory_allocations>Memory Allocations</memory_allocations>
+		<debug name="Felsökning">
+			<threads>Trådar</threads>
+			<semaphores>Semaforer</semaphores>
+			<mutexes>Mutexar</mutexes>
+			<lightweight_mutexes>Lättviktiga mutexar</lightweight_mutexes>
+			<condition_variables>Villkorsvariabler</condition_variables>
+			<lightweight_condition_variables>Lättviktiga villkorsvariabler</lightweight_condition_variables>
+			<event_flags>Händelseflaggor</event_flags>
+			<memory_allocations>Minnesallokering</memory_allocations>
 			<disassembly>Disassembly</disassembly>
 		</debug>
 		<configuration name="Konfiguration">
@@ -37,12 +37,12 @@
 	</main_menubar>
 
 	<about name="About">
-		<vita3k>Vita3K: en PS Vita/PS TV Emulator. The world's first functional PS Vita/PS TV emulator.</vita3k>
-		<about_vita3k>Vita3K är en experimentell PlayStation Vita/PlayStation TV-emulator skriven I C++ för operativsystemen Windows, Linux, macOS och Android och baserad på öppen källkod.</about_vita3k>
-		<special_credit>Special credit: The Vita3K icon was designed by:</special_credit>
-		<github_website>If you're interested in contributing, check out our:</github_website>
-		<vita3k_website>Visit our website for more info:</vita3k_website>
-		<ko-fi_website>If you want to support us, you can make a donation or subscribe to our:</ko-fi_website>
+		<vita3k>Vita3K: en PS Vita/PS TV-emulator. Världens första funktionella PS Vita/PS TV-emulator.</vita3k>
+		<about_vita3k>Vita3K är en experimentell PlayStation Vita/PlayStation TV-emulator skriven I C++ för operativsystemen Windows, Linux, macOS samt Android och är baserad på öppen källkod.</about_vita3k>
+		<special_credit>Speciallt tack: Vita3K-ikonen designades av:</special_credit>
+		<github_website>Om du är intresserad att bidra, se vår:</github_website>
+		<vita3k_website>Besök vår webbplats för mer info:</vita3k_website>
+		<ko-fi_website>Om du vill hjälpa oss kan du göra en donation eller prenumerera på vår:</ko-fi_website>
 		<vita3k_staff>Vita3K Staff</vita3k_staff>
 		<developers>Utvecklare</developers>
 		<contributors>Bidragsgivare</contributors>
@@ -50,26 +50,26 @@
 	</about>
 
 	<app_context>
-		<check_app_state>Check App state</check_app_state>
-		<copy_vita3k_summary>Copy Vita3K Summary</copy_vita3k_summary>
-		<open_state_report>Open state report</open_state_report>
-		<create_state_report>Create state report</create_state_report>
-		<update_database>Update database</update_database>
-		<copy_app_info>Copy App info</copy_app_info>
-		<name_and_id>Name and Title ID</name_and_id>
-		<app_summary>App Summary</app_summary>
-		<custom_config>Custom Config</custom_config>
+		<check_app_state>Kontrollera programtillstånd</check_app_state>
+		<copy_vita3k_summary>Kopiera Vita3K-sammandrag</copy_vita3k_summary>
+		<open_state_report>Öppna tillståndsrapport</open_state_report>
+		<create_state_report>Skapa tillståndsrapport</create_state_report>
+		<update_database>Uppdatera databasen</update_database>
+		<copy_app_info>Kopiera programinfo</copy_app_info>
+		<name_and_id>Namn och titel-id</name_and_id>
+		<app_summary>Programsammandrag</app_summary>
+		<custom_config>Anpassad konfig</custom_config>
 		<create>Skapa</create>
 		<edit>Redigera</edit>
 		<remove>Ta bort</remove>
 		<open_folder>Öppna mapp</open_folder>
 		<addcont>DLC</addcont>
 		<license>Licens</license>
-		<shaders_cache>Shaders Cache</shaders_cache>
-		<shaders_log>Shaders Log</shaders_log>
-		<manual>Manual</manual>
+		<shaders_cache>Shaders-cache</shaders_cache>
+		<shaders_log>Shaders-logg</shaders_log>
+		<manual>Manuell</manual>
 		<update>Uppdatera</update>
-		<update_history>Update History</update_history>
+		<update_history>Uppdateringshistorik</update_history>
 		<history_version>Version {}</history_version>
 		<information>Information</information>
 		<delete>
@@ -83,17 +83,17 @@ depending on its size and your hardware.</app_delete_description>
 		<info>
 			<eligible>Möjligt</eligible>
 			<ineligible>Inte möjligt</ineligible>
-			<level>Level</level>
-			<name>Name</name>
+			<level>Nivå</level>
+			<name>Namn</name>
 			<trophy_earning>Trophy Earning</trophy_earning>
 			<parental_controls>Parental Controls</parental_controls>
-			<updated>Updated</updated>
-			<size>Size</size>
+			<updated>Uppdaterad</updated>
+			<size>Storlek</size>
 			<version>Version</version>
-			<title_id>Title ID</title_id>
+			<title_id>Titel-id</title_id>
 			<last_time_used>Last time used</last_time_used>
 			<time_used>Time used</time_used>
-			<never>Never</never>
+			<never>Aldrig</never>
 		</info>
 		<time_used>
 			<time_used_seconds>{}s</time_used_seconds>
@@ -109,13 +109,13 @@ depending on its size and your hardware.</app_delete_description>
 Felkod: {}</an_error_occurred>
 		<cancel>Avbryt</cancel>
 		<close>Stäng</close>
-		<delete>Radera</delete>
+		<delete>Ta bort</delete>
 		<file_corrupted>Filen är skadad.</file_corrupted>
 		<microphone_disabled>Aktivera mikrofonen.</microphone_disabled>
 		<no>Nej</no>
 		<please_wait>Vänta...</please_wait>
 		<search>Sök</search>
-		<select_all>Markera alla</select_all>
+		<select_all>Markera allt</select_all>
 		<select>Välj</select>
 		<submit>Skicka</submit>
 		<yes>Ja</yes>
@@ -240,17 +240,17 @@ Felkod: {}</an_error_occurred>
 		<states>
 			<state id = "-1">Okänt</state>
 			<state id = "0">Ingenting</state>
-			<state id = "1">Bootable</state>
+			<state id = "1">Startbart</state>
 			<state id = "2">Intro</state>
 			<state id = "3">Meny</state>
 			<state id = "4">Ingame -</state>
 			<state id = "5">Ingame +</state>
-			<state id = "6">Playable</state>
+			<state id = "6">Spelbart</state>
 		</states>
 	</compatibility>
 
 	<compat_db>
-		<error>Error</error>
+		<error>Fel</error>
 		<information>Information</information>
 		<get_failed>Failed to get current compatibility database, check firewall/internet access, try again later.</get_failed>
 		<download_failed>Failed to download Applications compatibility database updated at: {}, try again later.</download_failed>
@@ -284,24 +284,24 @@ Felkod: {}</an_error_occurred>
 	</content_manager>
 
 	<controllers name="Controllers">
-		<connected>{} controllers connected</connected>
-		<name>Name</name>
+		<connected>{} handkontroller anslutna</connected>
+		<name>Namn</name>
 		<num>Num</num>
 		<not_connected>No compatible controllers connected.
 Connect a controller that is compatible with SDL2.</not_connected>
 		<motion_support>Gamepad has motion support</motion_support>
 		<rebind_controls>Rebind Controls</rebind_controls>
-		<led_color>LED Color</led_color>
+		<led_color>LED-färg</led_color>
 		<use_custom_color>Use Custom Color</use_custom_color>
 		<use_custom_color_description>Check this box to use custom color for the controller's LED.</use_custom_color_description>
-		<red>Red</red>
-		<green>Green</green>
-		<blue>Blue</blue>
+		<red>Röd</red>
+		<green>Grön</green>
+		<blue>Blå</blue>
 		<reset_controller_binding>Reset Controller Binding</reset_controller_binding>
 	</controllers>
 
 	<controls name="Controls">
-		<button>Button</button>
+		<button>Knapp</button>
 		<mapped_button>Mapped button</mapped_button>
 		<left_stick_up>Left stick up</left_stick_up>
 		<left_stick_down>Left stick down</left_stick_down>
@@ -329,8 +329,8 @@ Connect a controller that is compatible with SDL2.</not_connected>
 		<r2_button>R2 button</r2_button>
 		<l3_button>L3 button</l3_button>
 		<r3_button>R3 button</r3_button>
-		<gui>GUI</gui>
-		<full_screen>Full Screen</full_screen>
+		<gui>Grafiskt gränssnitt</gui>
+		<full_screen>Helskärm</full_screen>
 		<toggle_touch>Toggle Touch</toggle_touch>
 		<toggle_touch_description>Toggles between back touch and screen touch.</toggle_touch_description>
 		<toggle_gui_visibility>Toggle GUI Visibility</toggle_gui_visibility>
@@ -338,7 +338,7 @@ Connect a controller that is compatible with SDL2.</not_connected>
 		<miscellaneous>Miscellaneous</miscellaneous>
 		<toggle_texture_replacement>Toggle Texture Replacement</toggle_texture_replacement>
 		<take_a_screenshot>Take A Screenshot</take_a_screenshot>
-		<error>Error</error>
+		<error>Fel</error>
 		<error_duplicate_key>The key is used for other bindings or it is reserved.</error_duplicate_key>
 	</controls>
 
@@ -386,14 +386,14 @@ Stäng inte av systemet och stäng inte applikationen.</warning_saving>
 
 	<home_screen>
 		<filter>Filter</filter>
-		<sort_app>Sort Apps By</sort_app>
-		<all>All</all>
-		<by_region>By Region</by_region>
+		<sort_app>Sortera program efter</sort_app>
+		<all>Alla</all>
+		<by_region>Efter region</by_region>
 		<usa>USA</usa>
-		<europe>Europe</europe>
+		<europe>Europa</europe>
 		<japan>Japan</japan>
-		<asia>Asia</asia>
-		<by_type>By Type</by_type>
+		<asia>Asien</asia>
+		<by_type>Efter typ</by_type>
 		<commercial>Commercial</commercial>
 		<homebrew>Homebrew</homebrew>
 		<by_compatibility_state>By Compatibility State</by_compatibility_state>
@@ -401,7 +401,7 @@ Stäng inte av systemet och stäng inte applikationen.</warning_saving>
 		<cat>Cat</cat>
 		<comp>Comp</comp>
 		<last_time>Last Time</last_time>
-		<refresh>Refresh</refresh>
+		<refresh>Uppdatera</refresh>
 	</home_screen>
 
 	<indicator>
@@ -416,15 +416,15 @@ Stäng inte av systemet och stäng inte applikationen.</warning_saving>
 	</indicator>
 
 	<initial_setup>
-		<back>Back</back>
+		<back>Bakåt</back>
 		<completed_setup>You have now completed initial setup.
 Your Vita3K system is ready!</completed_setup>
-		<select_language>Select a language.</select_language>
+		<select_language>Välj ett språk.</select_language>
 		<select_pref_path>Select a pref path.</select_pref_path>
 		<current_emu_path>Current emulator path</current_emu_path>
 		<change_emu_path>Change Emulator Path</change_emu_path>
 		<reset_emu_path>Reset Emulator Path</reset_emu_path>
-		<install_firmware>Install Firmware.</install_firmware>
+		<install_firmware>Installera firmware.</install_firmware>
 		<install_highly_recommended>Installing both firmware files is highly recommended.</install_highly_recommended>
 		<installed>Installed:</installed>
 		<download_firmware>Download Firmware</download_firmware>
@@ -458,10 +458,10 @@ and also for Asian regional font support. (Generally Recommended)</firmware_font
 			<delete_firmware>Delete the firmware installation file?</delete_firmware>
 		</firmware_install>
 		<pkg_install>
-			<select_license_type>Select license type</select_license_type>
-			<select_bin_rif>Select work.bin/rif</select_bin_rif>
-			<enter_zrif>Enter zRIF</enter_zrif>
-			<enter_zrif_key>Enter zRIF key</enter_zrif_key>
+			<select_license_type>Välj licenstype</select_license_type>
+			<select_bin_rif>Välj work.bin/rif</select_bin_rif>
+			<enter_zrif>Ange zRIF</enter_zrif>
+			<enter_zrif_key>Ange zRIF-nyckel</enter_zrif_key>
 			<input_zrif>Please input your zRIF here</input_zrif>
 			<copy_paste_zrif>Ctrl (Cmd) + C to copy, Ctrl (Cmd) + V to paste.</copy_paste_zrif>
 			<delete_pkg>Delete the pkg file?</delete_pkg>
@@ -470,15 +470,15 @@ and also for Asian regional font support. (Generally Recommended)</firmware_font
 Check pkg and work.bin/rif file or zRIF key.</failed_install_package>
 		</pkg_install>
 		<archive_install>
-			<select_install_type>Select install type</select_install_type>
-			<select_file>Select File</select_file>
-			<select_directory>Select Directory</select_directory>
+			<select_install_type>Välj installationstyp</select_install_type>
+			<select_file>Välj fil</select_file>
+			<select_directory>Välj katalog</select_directory>
 			<compatible_content>{} archive(s) found with compatible contents.</compatible_content>
 			<successed_install_archive>{} archive(s) contents successfully installed:</successed_install_archive>
 			<update_app>Update App to:</update_app>
 			<failed_install_archive>Failed to install {} archive(s) contents:</failed_install_archive>
 			<not_compatible_content>No compatible content found in {} archive(s):</not_compatible_content>
-			<delete_archive>Delete archive?</delete_archive>
+			<delete_archive>Ta bort arkiv?</delete_archive>
 		</archive_install>
 		<license_install>
 			<successed_install_license>Successfully installed license.</successed_install_license>
@@ -493,8 +493,8 @@ Check work.bin/rif file or zRIF key.</failed_install_license>
 	</install_dialog>
 
 	<live_area>
-		<start>Start</start>
-		<continue>Continue</continue>
+		<start>Starta</start>
+		<continue>Fortsätt</continue>
 		<help>
 			<control_setting>Using configuration set for keyboard in control setting</control_setting>
 			<firmware_not_detected>Firmware not detected. Installation is highly recommended</firmware_not_detected>
@@ -535,7 +535,7 @@ Check vita3k.log to see console output for details.
 	<settings name="Inställningar">
 		<theme_background name="Tema och bakgrund">
 			<default>Standard</default>
-			<theme name="Theme">
+			<theme name="Tema">
 				<find_a_psvita_custom_themes>Find a PSVita Custom Themes</find_a_psvita_custom_themes>
 				<information name="Information">
 					<name>Namn</name>
@@ -552,8 +552,8 @@ Check vita3k.log to see console output for details.
 				<add_image>Lägg till bild</add_image>
 			</start_screen>
 			<home_screen_backgrounds name="Bakgrunder för hemskärmen">
-				<delete_background>Delete Background</delete_background>
-				<add_background>Add Background</add_background>
+				<delete_background>Ta bort bakgrund</delete_background>
+				<add_background>Lägg till bakgrund</add_background>
 			</home_screen_backgrounds>
 		</theme_background>
 		<date_time name="Datum och tid">
@@ -598,23 +598,23 @@ Check vita3k.log to see console output for details.
 			<modules_mode>Modules Mode</modules_mode>
 			<modules_list>Modules List</modules_list>
 			<select_modules>Select your desired modules.</select_modules>
-			<search_modules>Search Modules</search_modules>
-			<clear_list>Clear List</clear_list>
+			<search_modules>Sök moduler</search_modules>
+			<clear_list>Töm lista</clear_list>
 			<no_modules>No modules present.
 Please download and install the last PS Vita firmware.</no_modules>
 			<refresh_list>Refresh List</refresh_list>
-			<automatic>Automatic</automatic>
+			<automatic>Automatiskt</automatic>
 			<automatic_description>Select Automatic mode to use a preset list of modules.</automatic_description>
 			<auto_manual>Auto & Manual</auto_manual>
 			<auto_manual_description>Select this mode to load Automatic module and selected modules from the list below.</auto_manual_description>
-			<manual>Manual</manual>
+			<manual>Manuellt</manual>
 			<manual_description>Select Manual mode to load selected modules from the list below.</manual_description>
 		</core>
 		<cpu>
 			<unicorn>Unicorn (deprecated)</unicorn>
-			<cpu_backend>CPU Backend</cpu_backend>
+			<cpu_backend>CPU-bakände</cpu_backend>
 			<select_cpu_backend>Select your preferred CPU backend.</select_cpu_backend>
-			<cpu_opt>Enable optimizations</cpu_opt>
+			<cpu_opt>Aktivera optimeringar</cpu_opt>
 			<cpu_opt_description>Check the box to enable additional CPU JIT optimizations.</cpu_opt_description>
 		</cpu>
 		<gpu>
@@ -624,7 +624,7 @@ Please download and install the last PS Vita firmware.</no_modules>
 			<gpu>GPU (Reboot to apply)</gpu>
 			<select_gpu>Select the GPU Vita3K should run on.</select_gpu>
 			<standard>Standard</standard>
-			<high>High</high>
+			<high>Hög</high>
 			<renderer_accuracy>Renderer Accuracy</renderer_accuracy>
 			<v_sync>V-Sync</v_sync>
 			<v_sync_description>Disabling V-Sync can fix the speed issue in some games.
@@ -637,9 +637,9 @@ Gives a big performance boost if disabled (in particular when upscaling is on).<
 			<async_pipeline_compilation_description>Allow pipelines to be compiled concurrently on multiple concurrent threads.
 This decreases pipeline compilation stutter at the cost of temporary graphical glitches.</async_pipeline_compilation_description>
 			<nearest>Nearest</nearest>
-			<bilinear>Bilinear</bilinear>
-			<bicubic>Bicubic</bicubic>
-			<screen_filter>Screen Filter</screen_filter>
+			<bilinear>Bilinjär</bilinear>
+			<bicubic>Bikubisk</bicubic>
+			<screen_filter>Skärmfilter</screen_filter>
 			<screen_filter_description>Set post-processing filter to apply.</screen_filter_description>
 			<internal_resolution_upscaling>Internal Resolution Upscaling</internal_resolution_upscaling>
 			<internal_resolution_upscaling_description>Enable upscaling for Vita3K.
@@ -649,8 +649,8 @@ Experimental: games are not guaranteed to render properly at more than 1x.</inte
 which are sloped relative to the viewer.
 It has no drawback but can impact performance.</anisotropic_filtering_description>
 			<texture_replacement>Texture Replacement</texture_replacement>
-			<export_textures>Export Textures</export_textures>
-			<import_textures>Import Textures</import_textures>
+			<export_textures>Exportera texturer</export_textures>
+			<import_textures>Importera texturer</import_textures>
 			<texture_exporting_format>Texture Exporting Format</texture_exporting_format>
 			<shaders>Shaders</shaders>
 			<shader_cache>Use Shader Cache</shader_cache>
@@ -666,7 +666,7 @@ and not all GPUs are compatible with this.</spirv_shader_description>
 Note that this is a hack and will only work on some games.
 On other games, it may have no effect or make them run twice as fast.</fps_hack_description>
 		</gpu>
-		<audio name="Audio">
+		<audio name="Ljud">
 			<audio_backend>Audio Backend</audio_backend>
 			<select_audio_backend>Select your preferred audio backend.</select_audio_backend>
 			<audio_volume>Audio Volume</audio_volume>
@@ -744,7 +744,7 @@ You will need to move your old folder to the new location manually.</reset_emu_p
 			<screenshot_image_type>screenshot image type</screenshot_image_type>
 			<screenshot_format>Screenshot format</screenshot_format>
 		</emulator>
-		<gui name="GUI">
+		<gui name="Grafiskt gränssnitt">
 			<show_gui>GUI Visible</show_gui>
 			<gui_description>Check the box to show GUI after booting an application.</gui_description>
 			<show_info_bar>Info Bar Visible</show_info_bar>
@@ -787,7 +787,7 @@ The minimum is opaque and the maximum is transparent.</select_background_alpha>
 			<delay_start>Delay for start screen</delay_start>
 			<select_delay_start>Select the delay (in seconds) before returning to the start screen.</select_delay_start>
 		</gui>
-		<network name="Network">
+		<network name="Nätverk">
 			<psn_signed_in>Signed in PSN</psn_signed_in>
 			<psn_signed_in_description>If checked, games will consider the user is connected to the PSN network (but offline).</psn_signed_in_description>
 			<enable_http>Enable HTTP</enable_http>
@@ -863,10 +863,10 @@ You can earn trophies by using an application that supports the trophy feature.<
 	</trophy_collection>
 
 	<user_management>
-		<select_user>Select User</select_user>
-		<create_user>Create User</create_user>
+		<select_user>Välj användare</select_user>
+		<create_user>Skapa användare</create_user>
 		<user_created>The following user has been created.</user_created>
-		<edit_user>Edit User</edit_user>
+		<edit_user>Redigera användare</edit_user>
 		<open_user_folder>Open User Folder</open_user_folder>
 		<user_name_used>This name is already in use.</user_name_used>
 		<delete_user>Delete User</delete_user>
