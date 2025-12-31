@@ -48,7 +48,7 @@ void draw_archive_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
     static std::string title;
     static std::map<fs::path, std::vector<ContentInfo>> contents_archives;
     static std::vector<fs::path> invalid_archives;
-    static std::filesystem::path archive_path = "";
+    static fs::path archive_path{};
     static float global_progress = 0.f;
     static size_t archives_count = 0;
 
@@ -74,11 +74,11 @@ void draw_archive_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
     static std::mutex install_mutex;
     static const auto progress_callback = [&](const ArchiveContents &progress_value) {
         if (progress_value.count.has_value())
-            count = progress_value.count.value();
+            count = *progress_value.count;
         if (progress_value.current.has_value())
-            current = progress_value.current.value();
+            current = *progress_value.current;
         if (progress_value.progress.has_value())
-            progress = progress_value.progress.value();
+            progress = *progress_value.progress;
     };
     std::lock_guard<std::mutex> lock(install_mutex);
 
@@ -110,10 +110,12 @@ void draw_archive_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
         if (ImGui::Button(lang["select_file"].c_str(), BUTTON_SIZE))
             type = Type::FILE;
         ImGui::Spacing();
+#ifndef __ANDROID__
         ImGui::SetCursorPosX(POS_BUTTON);
         if (ImGui::Button(lang["select_directory"].c_str(), BUTTON_SIZE))
             type = Type::DIRECTORY;
         ImGui::Spacing();
+#endif
         ImGui::Separator();
         ImGui::Spacing();
         ImGui::SetCursorPosX(POS_BUTTON);
@@ -204,7 +206,7 @@ void draw_archive_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
             ImGui::SetCursorPos(ImVec2(PROGRESS_BAR_POS, ImGui::GetCursorPosY() + (14.f * SCALE.y)));
             ImGui::ProgressBar(progress / 100.f, ImVec2(PROGRESS_BAR_WIDTH, 15.f * SCALE.y), "");
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (6.f * SCALE.y));
-            TextColoredCentered(GUI_COLOR_TEXT, std::to_string(progress).append("%").c_str());
+            TextColoredCentered(GUI_COLOR_TEXT, std::to_string(static_cast<uint32_t>(progress)).append("%").c_str());
             ImGui::PopStyleColor();
             break;
         }
@@ -267,7 +269,9 @@ void draw_archive_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
             ImGui::PopStyleVar();
             ImGui::Separator();
             ImGui::Spacing();
+#ifndef __ANDROID__
             ImGui::Checkbox(lang["delete_archive"].c_str(), &delete_archive_file);
+#endif
             ImGui::SetCursorPos(ImVec2(POS_BUTTON, WINDOW_SIZE.y - BUTTON_SIZE.y - (12.f * SCALE.y)));
             if (ImGui::Button(common["ok"].c_str(), BUTTON_SIZE)) {
                 for (const auto &archive : contents_archives) {

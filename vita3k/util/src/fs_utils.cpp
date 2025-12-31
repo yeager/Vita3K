@@ -18,6 +18,8 @@
 #include <util/fs.h>
 #include <util/string_utils.h>
 
+#include <SDL3/SDL_iostream.h>
+
 namespace fs_utils {
 
 fs::path construct_file_name(const fs::path &base_path, const fs::path &folder_path, const fs::path &file_name, const fs::path &extension) {
@@ -55,5 +57,37 @@ void dump_data(const fs::path &path, const void *data, const std::streamsize siz
         of.close();
     }
 }
+template <typename T>
+static bool read_data(const fs::path &path, std::vector<T> &data) {
+    data.clear();
+    SDL_IOStream *file = SDL_IOFromFile(fs_utils::path_to_utf8(path).c_str(), "rb");
+    if (!file) {
+        return false;
+    }
+
+    // Get the size of the file
+    const Sint64 size = SDL_GetIOSize(file);
+    if (size <= 0) {
+        SDL_CloseIO(file);
+        return false;
+    }
+
+    // Resize the vector to fit the file content
+    data.resize(size);
+
+    // Read the content of the file
+    if (SDL_ReadIO(file, data.data(), size) != size) {
+        SDL_CloseIO(file);
+        data.clear();
+        return false;
+    }
+
+    SDL_CloseIO(file);
+    return true;
+}
+
+bool read_data(const fs::path &path, std::vector<uint8_t> &data) { return read_data<uint8_t>(path, data); }
+bool read_data(const fs::path &path, std::vector<int8_t> &data) { return read_data<int8_t>(path, data); }
+bool read_data(const fs::path &path, std::vector<char> &data) { return read_data<char>(path, data); }
 
 } // namespace fs_utils

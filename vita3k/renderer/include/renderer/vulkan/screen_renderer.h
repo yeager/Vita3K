@@ -32,31 +32,35 @@ struct VKState;
 class ScreenRenderer {
 public:
     VKState &state;
-    SDL_Window *window;
+    SDL_Window *window{};
 
     vk::SurfaceKHR surface;
     vk::SwapchainKHR swapchain;
 
     vk::SurfaceCapabilitiesKHR surface_capabilities;
     vk::SurfaceFormatKHR surface_format;
-    vk::PresentModeKHR present_mode;
+    vk::PresentModeKHR present_mode{};
 
     vk::Extent2D extent;
-    uint32_t swapchain_size;
+    uint32_t swapchain_size{};
     std::vector<vk::Image> swapchain_images;
     std::vector<vk::ImageView> swapchain_views;
     std::vector<vk::Framebuffer> swapchain_framebuffers;
     std::vector<vk::CommandBuffer> command_buffers;
     std::vector<vk::Fence> fences;
+    std::vector<vk::Semaphore> image_acquired_semaphores;
+    std::vector<vk::Semaphore> image_ready_semaphores;
 
     // renderpass used when no effect is done previously (clear the swapchain content)
     vk::RenderPass default_render_pass;
     // renderpass used after a post-processing pass clearing the swapchain, compatible with the default render pass
     vk::RenderPass post_filter_render_pass;
+#ifdef __ANDROID__
+    // renderpass used to (partially) prevent a driver bug using stock adreno drivers
+    vk::RenderPass stock_adreno_pass;
+#endif
 
     std::unique_ptr<ScreenFilter> filter;
-    std::vector<vk::Semaphore> image_acquired_semaphores;
-    std::vector<vk::Semaphore> image_ready_semaphores;
 
     std::vector<vkutil::Image> vita_surface;
     vma::Allocation vita_surface_staging_alloc;

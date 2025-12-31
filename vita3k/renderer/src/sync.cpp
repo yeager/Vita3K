@@ -24,7 +24,6 @@
 #include <display/state.h>
 #include <renderer/gl/functions.h>
 #include <renderer/vulkan/functions.h>
-#include <renderer/vulkan/types.h>
 
 #include <renderer/functions.h>
 #include <util/tracy.h>
@@ -42,7 +41,7 @@ COMMAND(handle_signal_sync_object) {
     SceGxmSyncObject *sync = helper.pop<Ptr<SceGxmSyncObject>>().get(mem);
     const uint32_t timestamp = helper.pop<uint32_t>();
 
-    if (features.support_memory_mapping && config.current_config.high_accuracy) {
+    if (features.enable_memory_mapping && config.current_config.high_accuracy) {
         assert(renderer.current_backend == renderer::Backend::Vulkan);
         vulkan::signal_sync_object(dynamic_cast<vulkan::VKState &>(renderer), sync, timestamp);
     } else {

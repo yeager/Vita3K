@@ -129,7 +129,7 @@ enum class NpComIdSortType {
     PROGRESS
 };
 static NpComIdSortType np_com_id_sort;
-bool show_hidden_trophy = false;
+static bool show_hidden_trophy = false;
 
 void init_trophy_collection(GuiState &gui, EmuEnvState &emuenv) {
     const auto TROPHY_PATH{ emuenv.pref_path / "ux0/user" / emuenv.io.user_id / "trophy" };
@@ -258,7 +258,7 @@ void init_trophy_collection(GuiState &gui, EmuEnvState &emuenv) {
                         continue;
                     }
 
-                    gui.trophy_np_com_id_list_icons[np_com_id][group.first].init(gui.imgui_state.get(), data, width, height);
+                    gui.trophy_np_com_id_list_icons[np_com_id][group.first] = ImGui_Texture(gui.imgui_state.get(), data, width, height);
                     stbi_image_free(data);
                 }
             }
@@ -346,7 +346,7 @@ static void get_trophy_list(GuiState &gui, EmuEnvState &emuenv, const std::strin
             continue;
         }
 
-        gui.trophy_list[trophy_id].init(gui.imgui_state.get(), data, width, height);
+        gui.trophy_list[trophy_id] = ImGui_Texture(gui.imgui_state.get(), data, width, height);
         stbi_image_free(data);
 
         auto &common = gui.lang.common.main;
@@ -762,6 +762,7 @@ void draw_trophy_collection(GuiState &gui, EmuEnvState &emuenv) {
             }
         }
     }
+    ImGui::ScrollWhenDragging();
     ImGui::EndChild();
 
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 10.f * SCALE.x);
@@ -769,7 +770,7 @@ void draw_trophy_collection(GuiState &gui, EmuEnvState &emuenv) {
 
     // Back
     ImGui::SetCursorPos(ImVec2(8.f * SCALE.x, WINDOW_SIZE.y - (52.f * SCALE.y)));
-    if (ImGui::Button("Back", ImVec2(64.f * SCALE.x, 40.f * SCALE.y)) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_circle))) {
+    if (ImGui::Button("<<", ImVec2(64.f * SCALE.x, 40.f * SCALE.y)) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_circle))) {
         if (!np_com_id_selected.empty()) {
             if (detail_np_com_id) {
                 detail_np_com_id = false;

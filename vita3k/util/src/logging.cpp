@@ -24,24 +24,35 @@
 
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/msvc_sink.h>
+#ifdef __ANDROID__
+#include <spdlog/sinks/android_sink.h>
+#else
 #include <spdlog/sinks/stdout_color_sinks.h>
+#endif
+
+#include <iostream>
+#include <vector>
 
 namespace logging {
 
 static const fs::path &LOG_FILE_NAME = "vita3k.log";
 static const char *LOG_PATTERN = "%^[%H:%M:%S.%e] |%L| [%!]: %v%$";
-std::vector<spdlog::sink_ptr> sinks;
+static std::vector<spdlog::sink_ptr> sinks;
 
-void register_log_exception_handler();
+static void register_log_exception_handler();
 
-void flush() {
+static void flush() {
     spdlog::details::registry::instance().flush_all();
 }
 
 ExitCode init(const Root &root_paths, bool use_stdout) {
     sinks.clear();
     if (use_stdout)
+#ifdef __ANDROID__
+        sinks.push_back(std::make_shared<spdlog::sinks::android_sink_mt>());
+#else
         sinks.push_back(std::make_shared<spdlog::sinks::stdout_color_sink_mt>());
+#endif
 
     if (add_sink(root_paths.get_log_path() / LOG_FILE_NAME) != Success)
         return InitConfigFailed;
@@ -55,6 +66,11 @@ ExitCode init(const Root &root_paths, bool use_stdout) {
     // set console codepage to UTF-8
     SetConsoleOutputCP(65001);
     SetConsoleTitle("Vita3K PSVita Emulator");
+#endif
+
+#ifdef __ANDROID__
+    // needed, otherwise the log file contains nothing
+    spdlog::flush_on(spdlog::level::trace);
 #endif
 
     register_log_exception_handler();

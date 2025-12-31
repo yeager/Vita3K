@@ -28,6 +28,11 @@
 #include <stb_image.h>
 #include <stb_image_write.h>
 
+#ifdef __ANDROID__
+// for message popup
+#include <SDL3/SDL_system.h>
+#endif
+
 static constexpr bool log_texture_import = false;
 static constexpr bool log_texture_export = true;
 
@@ -107,10 +112,8 @@ void TextureCache::export_select(const SceGxmTexture &texture) {
         const uint32_t mipcount = texture::get_upload_mip(texture.true_mip_count(), width, height);
         const uint32_t array_size = is_cube ? 6 : 1;
         ddspp::TextureType texture_type = is_cube ? ddspp::Cubemap : ddspp::Texture2D;
-        ddspp::Header header;
-        memset(&header, 0, sizeof(header));
-        ddspp::HeaderDXT10 dxt_header;
-        memset(&dxt_header, 0, sizeof(dxt_header));
+        ddspp::Header header = {};
+        ddspp::HeaderDXT10 dxt_header = {};
         ddspp::encode_header(dxgi_format, width, height, 1, texture_type, mipcount, array_size, header, dxt_header);
 
         // we need to do this to get the descriptor anyway
@@ -205,7 +208,7 @@ void TextureCache::export_texture_impl(SceGxmTextureBaseFormat base_format, uint
             apply_swizzle_4<uint16_t, 5, 5, 5, 1>(pixels, data_unswizzled.data(), nb_pixels, alpha_is_1, swap_rb);
             break;
         default:
-            LOG_ERROR("Unhandled swizzle for texture format {}, please report it to the developers.", log_hex(fmt::underlying(base_format)));
+            LOG_ERROR("Unhandled swizzle for texture format 0x{:0X}, please report it to the developers.", fmt::underlying(base_format));
             return;
         }
 
@@ -227,7 +230,6 @@ void TextureCache::export_texture_impl(SceGxmTextureBaseFormat base_format, uint
 
         std::array<uint8_t, 4> *data_dst4 = reinterpret_cast<std::array<uint8_t, 4> *>(converted_data.data());
         std::array<uint8_t, 3> *data_dst3 = reinterpret_cast<std::array<uint8_t, 3> *>(converted_data.data());
-        const uint32_t nb_pixels = pixels_per_stride * height;
 
         // the png write function only accepts u8* textures, so convert everything to it
         switch (base_format) {
@@ -332,7 +334,7 @@ void TextureCache::export_texture_impl(SceGxmTextureBaseFormat base_format, uint
             break;
         }
         default:
-            LOG_ERROR("Unhandled format for png exportation {}, please report it to the developers.", log_hex(fmt::underlying(base_format)));
+            LOG_ERROR("Unhandled format for png exportation 0x{:0X}, please report it to the developers.", fmt::underlying(base_format));
             return;
         }
 
@@ -359,7 +361,7 @@ void TextureCache::export_texture_impl(SceGxmTextureBaseFormat base_format, uint
                 memcpy(converted_data.data(), data, nb_pixels * nb_comp);
                 data = converted_data.data();
             }
-            uint8_t *pixels = const_cast<uint8_t *>(data);
+            uint8_t *src_pixels = const_cast<uint8_t *>(data);
 
             auto convert_to_linear = [](uint8_t pixel) {
                 // linear = srgb^(2.2)
@@ -367,14 +369,14 @@ void TextureCache::export_texture_impl(SceGxmTextureBaseFormat base_format, uint
             };
             if (nb_comp == 3) {
                 for (uint32_t i = 0; i < nb_pixels; i++) {
-                    pixels[i] = convert_to_linear(pixels[i]);
+                    src_pixels[i] = convert_to_linear(src_pixels[i]);
                 }
             } else {
                 // alpha is already linear
                 for (uint32_t i = 0; i < nb_pixels; i++) {
-                    pixels[i * 4 + 0] = convert_to_linear(pixels[i * 4 + 0]);
-                    pixels[i * 4 + 1] = convert_to_linear(pixels[i * 4 + 1]);
-                    pixels[i * 4 + 2] = convert_to_linear(pixels[i * 4 + 2]);
+                    src_pixels[i * 4 + 0] = convert_to_linear(src_pixels[i * 4 + 0]);
+                    src_pixels[i * 4 + 1] = convert_to_linear(src_pixels[i * 4 + 1]);
+                    src_pixels[i * 4 + 2] = convert_to_linear(src_pixels[i * 4 + 2]);
                 }
             }
         }
@@ -468,17 +470,14 @@ bool TextureCache::import_configure_texture() {
         if (dds_descriptor == nullptr)
             dds_descriptor = new ddspp::Descriptor;
 
-        fs::ifstream file(import_name, std::ios_base::binary | std::ios_base::ate);
-        const size_t file_size = file.tellg();
-        imported_texture_raw_data.resize(std::max<size_t>(ddspp::MAX_HEADER_SIZE, file_size));
-
-        file.seekg(0);
-        file.read(reinterpret_cast<char *>(imported_texture_raw_data.data()), file_size);
-        if (file.gcount() != file_size) {
+        auto res = fs_utils::read_data(import_name, imported_texture_raw_data);
+        if (!res) {
             LOG_ERROR("Failed to read {}", file_name);
             return false;
         }
-        file.close();
+        if (imported_texture_raw_data.size() < ddspp::MAX_HEADER_SIZE) {
+            imported_texture_raw_data.resize(ddspp::MAX_HEADER_SIZE);
+        }
 
         if (ddspp::decode_header(imported_texture_raw_data.data(), *dds_descriptor) != ddspp::Success) {
             LOG_ERROR("Failed to decode file {} header", file_name);
@@ -497,12 +496,26 @@ bool TextureCache::import_configure_texture() {
         height = dds_descriptor->height;
         mipcount = dds_descriptor->numMips;
         base_format = dxgi_to_gxm(dds_descriptor->format);
-        if (base_format == static_cast<SceGxmTextureBaseFormat>(-1)) {
+        if (base_format == SCE_GXM_TEXTURE_BASE_FORMAT_INVALID) {
             LOG_ERROR("dds format {} used by texture {} is unhandled", fmt::underlying(dds_descriptor->format), file_name);
             return false;
         }
         is_srgb = ddspp::is_srgb(dds_descriptor->format);
         swap_rb = dds_swap_rb(dds_descriptor->format);
+
+        if (texture::is_astc_format(base_format) && !support_astc) {
+            LOG_ERROR_ONCE("ASTC textures are not support by this device");
+            return false;
+        }
+
+        if (gxm::is_bcn_format(base_format) && !support_dxt) {
+            LOG_ERROR_ONCE("BCn textures are not supported by this device");
+#ifdef __ANDROID__
+            // this issue is most likely to happen on android
+            SDL_ShowAndroidToast("BCn textures are not supported by this device!", 1, -1, 0, 0);
+#endif
+            return false;
+        }
 
         imported_texture_decoded = imported_texture_raw_data.data() + dds_descriptor->headerSize;
     } else {
@@ -604,7 +617,7 @@ void TextureCache::refresh_available_textures() {
                 continue;
 
             uint64_t hash;
-            if (sscanf(file.filename().string().c_str(), "%llX", &hash) != 1)
+            if (!(std::istringstream{ file.filename().string() } >> std::hex >> hash))
                 continue;
 
             if (file.extension() != ".png" && file.extension() != ".dds")
@@ -737,11 +750,20 @@ static SceGxmTextureBaseFormat dxgi_to_gxm(const ddspp::DXGIFormat format) {
     case B5G6R5_UNORM:
         return SCE_GXM_TEXTURE_BASE_FORMAT_U5U6U5;
     case B5G5R5A1_UNORM:
-        return SCE_GXM_TEXTURE_BASE_FORMAT_U5U6U5;
+        return SCE_GXM_TEXTURE_BASE_FORMAT_U1U5U5U5;
     case B4G4R4A4_UNORM:
         return SCE_GXM_TEXTURE_BASE_FORMAT_U4U4U4U4;
+
+#define ASTC_FMT(b_x, b_y)                \
+    case ASTC_##b_x##X##b_y##_UNORM:      \
+    case ASTC_##b_x##X##b_y##_UNORM_SRGB: \
+        return SCE_GXM_TEXTURE_BASE_FORMAT_ASTC##b_x##x##b_y;
+
+#include "../texture/astc_formats.inc"
+#undef ASTC_FMT
+
     default:
-        return static_cast<SceGxmTextureBaseFormat>(-1);
+        return SCE_GXM_TEXTURE_BASE_FORMAT_INVALID;
     }
 }
 
@@ -841,11 +863,19 @@ static ddspp::DXGIFormat dxgi_apply_srgb(const ddspp::DXGIFormat format) {
     case BC1_UNORM:
         return BC1_UNORM_SRGB;
     case BC2_UNORM:
-        return BC1_UNORM_SRGB;
+        return BC2_UNORM_SRGB;
     case BC3_UNORM:
         return BC3_UNORM_SRGB;
     case BC7_UNORM:
         return BC7_UNORM_SRGB;
+
+#define ASTC_FMT(b_x, b_y)           \
+    case ASTC_##b_x##X##b_y##_UNORM: \
+        return ASTC_##b_x##X##b_y##_UNORM_SRGB;
+
+#include "../texture/astc_formats.inc"
+#undef ASTC_FMT
+
     default:
         return format;
     }
@@ -920,7 +950,6 @@ static void apply_swizzle_4(const void *src, void *dst, uint32_t nb_pixels, bool
     constexpr T maskr2 = ((one << size2) - 1) << (size3 + size4);
     constexpr T maskr3 = ((one << size3) - 1) << size4;
     constexpr T maskr4 = ((one << size4) - 1);
-    constexpr T total_size = sizeof(T) * 8;
 
     // used for swapping r and b
     constexpr T mask_rb = ((one << size1) - 1) | (((one << size3) - 1) << (size1 + size2));
@@ -954,7 +983,6 @@ template <typename T, size_t size1, size_t size2, size_t size3>
 static void reverse_comp3_order(const void *src, void *dst, uint32_t nb_pixels) {
     static_assert(size1 == size3);
 
-    constexpr T one = 1;
     constexpr size_t rgb_size = size1 + size2 + size3;
     // this happens only for shared exponent textures
     constexpr bool has_leftover = (rgb_size < sizeof(T) * 8);

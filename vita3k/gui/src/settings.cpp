@@ -32,6 +32,7 @@
 
 #include <pugixml.hpp>
 #include <stb_image.h>
+#include <util/vector_utils.h>
 
 #undef ERROR
 
@@ -157,7 +158,7 @@ static void get_themes_list(GuiState &gui, EmuEnvState &emuenv) {
         theme_preview_name["default"][LOCK] = "data/internal/theme/defaultTheme_startScreen.png";
 
         themes_info["default"].title = gui.lang.settings.theme_background.main["default"];
-        themes_list.push_back({ "default", {} });
+        themes_list.emplace_back("default", time_t{});
     } else
         LOG_WARN("Default theme not found, install firmware fix this!");
 
@@ -183,7 +184,7 @@ static void get_themes_list(GuiState &gui, EmuEnvState &emuenv) {
                     continue;
                 }
 
-                gui.themes_preview[content_id][preview_type].init(gui.imgui_state.get(), data, width, height);
+                gui.themes_preview[content_id][preview_type] = ImGui_Texture(gui.imgui_state.get(), data, width, height);
                 stbi_image_free(data);
             }
         }
@@ -192,6 +193,39 @@ static void get_themes_list(GuiState &gui, EmuEnvState &emuenv) {
     // Update last updated themes list
     last_updated_themes_list = time(0);
 }
+
+#ifdef __ANDROID__
+bool copy_file_from_host(const fs::path &src, const fs::path &dst) {
+    fs::create_directories(dst.parent_path());
+
+    FILE *infile = host::dialog::filesystem::resolve_host_handle(src);
+    if (!infile) {
+        LOG_ERROR("Failed to open source file: {}", src.string());
+        return false;
+    }
+
+    FILE *outfile = fopen(dst.string().c_str(), "wb");
+    if (!outfile) {
+        LOG_ERROR("Failed to create destination file: {}", dst.string());
+        fclose(infile);
+        return false;
+    }
+
+    constexpr size_t BUFFER_SIZE = 4096;
+    std::vector<uint8_t> buffer(BUFFER_SIZE);
+    size_t bytes_read = 0;
+
+    while ((bytes_read = fread(buffer.data(), 1, BUFFER_SIZE, infile)) > 0) {
+        fwrite(buffer.data(), 1, bytes_read, outfile);
+    }
+
+    fclose(infile);
+    fclose(outfile);
+
+    LOG_INFO("Successfully copied file from {} to {}", src.string(), dst.string());
+    return true;
+}
+#endif
 
 void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
     static std::string selected, title, delete_user_background, delete_theme;
@@ -363,6 +397,18 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
         ImGui::Separator();
         break;
     case SettingsMenu::THEME_BACKGROUND: {
+#ifdef __ANDROID__
+        const auto remove_image = [&](const std::string &path) {
+            if (!path.empty()) {
+                const fs::path image_path = fs_utils::utf8_to_path(path);
+
+                if (fs::exists(image_path)) {
+                    fs::remove(image_path);
+                    LOG_INFO("image removed: {}", path);
+                }
+            }
+        };
+#endif
         // Themes & Backgrounds
         const auto select = common["select"].c_str();
         switch (menu) {
@@ -464,6 +510,9 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                     ImGui::SetWindowFontScale(1.2f);
                     ImGui::SetCursorPos(ImVec2((SIZE_LIST.x / 2.f) - (BUTTON_SIZE.x / 2.f), (SIZE_LIST.y - 82.f) - BUTTON_SIZE.y));
                     if ((selected != gui.users[emuenv.io.user_id].theme_id) && (ImGui::Button(select, BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross)))) {
+#ifdef __ANDROID__
+                        remove_image(gui.users[emuenv.io.user_id].start_path);
+#endif
                         gui.users[emuenv.io.user_id].start_path.clear();
                         if (init_theme(gui, emuenv, selected)) {
                             gui.users[emuenv.io.user_id].theme_id = selected;
@@ -501,6 +550,9 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                     if (ImGui::Button(common["ok"].c_str(), BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross))) {
                         if (selected == gui.users[emuenv.io.user_id].theme_id) {
                             gui.users[emuenv.io.user_id].theme_id = "default";
+#ifdef __ANDROID__
+                            remove_image(gui.users[emuenv.io.user_id].start_path);
+#endif
                             gui.users[emuenv.io.user_id].start_path.clear();
                             if (init_theme(gui, emuenv, "default"))
                                 gui.users[emuenv.io.user_id].use_theme_bg = true;
@@ -645,6 +697,9 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                     }
                     ImGui::SetCursorPos(SELECT_BUTTON_POS);
                     if ((gui.users[emuenv.io.user_id].start_type != "theme") && (ImGui::Button(select, BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross)))) {
+#ifdef __ANDROID__
+                        remove_image(gui.users[emuenv.io.user_id].start_path);
+#endif
                         gui.users[emuenv.io.user_id].start_path.clear();
                         gui.users[emuenv.io.user_id].start_type = "theme";
                         init_theme_start_background(gui, emuenv, gui.users[emuenv.io.user_id].theme_id);
@@ -652,15 +707,31 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                         sub_menu = SubMenu::UNDEFINED;
                     }
                 } else if (sub_menu == SubMenu::IMAGE) {
-                    std::filesystem::path image_path = "";
-                    host::dialog::filesystem::Result result = host::dialog::filesystem::open_file(image_path, { { "Image file", { "bmp", "gif", "jpg", "png", "tif" } } });
+                    fs::path image_path{};
+                    host::dialog::filesystem::Result result = host::dialog::filesystem::open_file(image_path, { { "Image file", { "bmp", "gif", "jpg", "jpeg", "png", "tif" } } });
 
-                    if ((result == host::dialog::filesystem::Result::SUCCESS) && init_user_start_background(gui, fs_utils::path_to_utf8(image_path.native()))) {
-                        gui.users[emuenv.io.user_id].start_path = fs_utils::path_to_utf8(image_path.native());
-                        gui.users[emuenv.io.user_id].start_type = "image";
-                        save_user(gui, emuenv, emuenv.io.user_id);
-                    }
-                    if (result == host::dialog::filesystem::Result::ERROR) {
+                    if (result == host::dialog::filesystem::Result::SUCCESS) {
+                        const fs::path old_path = !gui.users[emuenv.io.user_id].start_path.empty()
+                            ? fs_utils::utf8_to_path(gui.users[emuenv.io.user_id].start_path)
+                            : fs::path{};
+#ifdef __ANDROID__
+                        const fs::path image_dst_path = emuenv.pref_path / "ux0/user" / emuenv.io.user_id / "image" / image_path.filename();
+                        if (copy_file_from_host(image_path, image_dst_path))
+                            image_path = image_dst_path;
+#endif
+                        if (fs::exists(image_path) && init_user_start_background(gui, fs_utils::path_to_utf8(image_path))) {
+                            gui.users[emuenv.io.user_id].start_path = fs_utils::path_to_utf8(image_path);
+                            gui.users[emuenv.io.user_id].start_type = "image";
+                            save_user(gui, emuenv, emuenv.io.user_id);
+                        }
+#ifdef __ANDROID__
+                        // Remove old image if different
+                        if (!old_path.empty() && (old_path != image_path)) {
+                            fs::remove(old_path);
+                            LOG_INFO("Old start image removed: {}", old_path);
+                        }
+#endif
+                    } else if (result == host::dialog::filesystem::Result::ERROR) {
                         LOG_CRITICAL("Error initializing file dialog: {}", host::dialog::filesystem::get_error());
                     }
                     sub_menu = SubMenu::UNDEFINED;
@@ -672,6 +743,9 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                     }
                     ImGui::SetCursorPos(SELECT_BUTTON_POS);
                     if ((gui.users[emuenv.io.user_id].start_type != "default") && (ImGui::Button(select, BUTTON_SIZE) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_cross)))) {
+#ifdef __ANDROID__
+                        remove_image(gui.users[emuenv.io.user_id].start_path);
+#endif
                         gui.users[emuenv.io.user_id].start_path.clear();
                         init_theme_start_background(gui, emuenv, "default");
                         gui.users[emuenv.io.user_id].start_type = "default";
@@ -687,11 +761,15 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
 
             // Delete user background
             if (!delete_user_background.empty()) {
+#ifdef __ANDROID__
+                // Remove background image file if it exists
+                remove_image(delete_user_background);
+#endif
                 vector_utils::erase_first(gui.users[emuenv.io.user_id].backgrounds, delete_user_background);
                 gui.user_backgrounds.erase(delete_user_background);
                 gui.user_backgrounds_infos.erase(delete_user_background);
                 if (!gui.users[emuenv.io.user_id].backgrounds.empty())
-                    gui.current_user_bg = gui.current_user_bg % uint64_t(gui.user_backgrounds.size());
+                    gui.current_user_bg = gui.current_user_bg % gui.user_backgrounds.size();
                 else if (!gui.theme_backgrounds.empty())
                     gui.users[emuenv.io.user_id].use_theme_bg = true;
                 save_user(gui, emuenv, emuenv.io.user_id);
@@ -717,17 +795,22 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                 ImGui::NextColumn();
             }
             if (ImGui::Selectable(theme_background.home_screen_backgrounds["add_background"].c_str(), false, ImGuiSelectableFlags_None, SIZE_PACKAGE)) {
-                std::filesystem::path background_path = "";
-                host::dialog::filesystem::Result result = host::dialog::filesystem::open_file(background_path, { { "Image file", { "bmp", "gif", "jpg", "png", "tif" } } });
-                auto background_path_string = fs_utils::path_to_utf8(background_path.native());
-                if ((result == host::dialog::filesystem::Result::SUCCESS) && (!gui.user_backgrounds.contains(background_path_string))) {
-                    if (init_user_background(gui, emuenv, background_path_string)) {
+                fs::path background_path{};
+                host::dialog::filesystem::Result result = host::dialog::filesystem::open_file(background_path, { { "Image file", { "bmp", "gif", "jpg", "jpeg", "png", "tif" } } });
+                if (result == host::dialog::filesystem::Result::SUCCESS) {
+#ifdef __ANDROID__
+                    const fs::path bg_dst_path = emuenv.pref_path / "ux0/user" / emuenv.io.user_id / "background" / background_path.filename();
+                    if (copy_file_from_host(background_path, bg_dst_path))
+                        background_path = bg_dst_path;
+#endif
+                    auto background_path_string = fs_utils::path_to_utf8(background_path);
+
+                    if (!gui.user_backgrounds.contains(background_path_string) && fs::exists(background_path) && init_user_background(gui, emuenv, background_path_string)) {
                         gui.users[emuenv.io.user_id].backgrounds.push_back(background_path_string);
                         gui.users[emuenv.io.user_id].use_theme_bg = false;
                         save_user(gui, emuenv, emuenv.io.user_id);
                     }
-                }
-                if (result == host::dialog::filesystem::Result::ERROR) {
+                } else if (result == host::dialog::filesystem::Result::ERROR) {
                     LOG_CRITICAL("Error initializing file dialog: {}", host::dialog::filesystem::get_error());
                 }
             }
@@ -784,7 +867,7 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                 };
 
                 for (auto f = 0; f < 3; f++) {
-                    auto date_format_value = SceSystemParamDateFormat(f);
+                    auto date_format_value = static_cast<SceSystemParamDateFormat>(f);
                     const auto date_format_str = get_date_format_sting(date_format_value);
                     ImGui::PushID(date_format_str.c_str());
                     ImGui::SetCursorPosY((WINDOW_SIZE.y / 2.f) - INFORMATION_BAR_HEIGHT - (SIZE_PUPUP_SELECT * 1.5f) + (SIZE_PUPUP_SELECT * f));
@@ -953,7 +1036,7 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                         ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0.f, 0.5f));
                         ImGui::PushID(lang.first);
                         ImGui::SetWindowFontScale(1.f);
-                        const auto is_lang_enable = vector_utils::contains(emuenv.cfg.ime_langs, uint64_t(lang.first));
+                        const auto is_lang_enable = vector_utils::contains(emuenv.cfg.ime_langs, static_cast<uint64_t>(lang.first));
                         if (ImGui::Selectable(is_lang_enable ? "V" : "##lang", false, ImGuiSelectableFlags_SpanAllColumns, ImVec2(0.f, SIZE_SELECT)))
                             selected = std::to_string(lang.first);
                         ImGui::NextColumn();
@@ -971,7 +1054,7 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
                     }
                     ImGui::Columns(1);
                 } else {
-                    SceImeLanguage lang_select = SceImeLanguage(string_utils::stoi_def(selected, 0, "language"));
+                    SceImeLanguage lang_select = static_cast<SceImeLanguage>(string_utils::stoi_def(selected, 0, "language"));
                     title = get_ime_lang_index(emuenv.ime, lang_select)->second;
                     ImGui::SetWindowFontScale(1.2f);
                     ImGui::Columns(2, nullptr, false);
@@ -1021,7 +1104,7 @@ void draw_settings(GuiState &gui, EmuEnvState &emuenv) {
     // Back
     ImGui::SetWindowFontScale(1.2f * RES_SCALE.x);
     ImGui::SetCursorPos(ImVec2(6.f * SCALE.x, WINDOW_SIZE.y - (52.f * SCALE.y)));
-    if (ImGui::Button("Back", ImVec2(64.f * SCALE.x, 40.f * SCALE.y)) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_circle))) {
+    if (ImGui::Button("<<", ImVec2(64.f * SCALE.x, 40.f * SCALE.y)) || ImGui::IsKeyPressed(static_cast<ImGuiKey>(emuenv.cfg.keyboard_button_circle))) {
         if (settings_menu != SettingsMenu::SELECT) {
             if (menu != Menu::UNDEFINED) {
                 if (!selected.empty()) {

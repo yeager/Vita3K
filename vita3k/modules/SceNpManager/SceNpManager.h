@@ -15,8 +15,9 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-#include <net/state.h>
+#pragma once
 
-bool init(NetState &state) {
-    return true;
-}
+#include <module/module.h>
+#include <np/state.h>
+
+DECL_EXPORT(int, sceNpManagerGetNpId, np::SceNpId *id);

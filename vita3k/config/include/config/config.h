@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <util/log.h>
 #include <util/system.h>
 
 enum ModulesMode {
@@ -68,12 +67,15 @@ enum ScreenshotFormat {
     code(bool, "apps-list-grid", false, apps_list_grid)                                                 \
     code(bool, "display-system-apps", true, display_system_apps)                                        \
     code(bool, "stretch_the_display_area", false, stretch_the_display_area)                             \
+    code(bool, "fullscreen_hd_res_pixel_perfect", false, fullscreen_hd_res_pixel_perfect)               \
     code(bool, "show-live-area-screen", true, show_live_area_screen)                                    \
     code(int, "icon-size", 64, icon_size)                                                               \
     code(bool, "archive-log", false, archive_log)                                                       \
-    code(std::string, "backend-renderer", "OpenGL", backend_renderer)                                   \
+    code(std::string, "backend-renderer", "Vulkan", backend_renderer)                                   \
+    code(std::string, "custom-driver-name", "", custom_driver_name)                                     \
+    code(bool, "turbo-mode", false, turbo_mode)                                                         \
     code(int, "gpu-idx", 0, gpu_idx)                                                                    \
-    code(bool, "high-accuracy", true, high_accuracy)                                                    \
+    code(bool, "high-accuracy", false, high_accuracy)                                                   \
     code(float, "resolution-multiplier", 1.0f, resolution_multiplier)                                   \
     code(bool, "disable-surface-sync", true, disable_surface_sync)                                      \
     code(std::string, "screen-filter", "Bilinear", screen_filter)                                       \
@@ -86,6 +88,7 @@ enum ScreenshotFormat {
     code(bool, "import-textures", false, import_textures)                                               \
     code(bool, "export-textures", false, export_textures)                                               \
     code(bool, "export-as-png", true, export_as_png)                                                    \
+    code(std::string, "memory-mapping", "double-buffer", memory_mapping)                                \
     code(bool, "boot-apps-full-screen", false, boot_apps_full_screen)                                   \
     code(std::string, "audio-backend", "SDL", audio_backend)                                            \
     code(int, "audio-volume", 100, audio_volume)                                                        \
@@ -99,8 +102,7 @@ enum ScreenshotFormat {
     code(int, "delay-background", 4, delay_background)                                                  \
     code(int, "delay-start", 10, delay_start)                                                           \
     code(float, "background-alpha", .300f, background_alpha)                                            \
-    code(int, "log-level", static_cast<int>(spdlog::level::trace), log_level)                           \
-    code(std::string, "cpu-backend", "Dynarmic", cpu_backend)                                           \
+    code(int, "log-level", 0 /*SPDLOG_LEVEL_TRACE*/, log_level)                                         \
     code(bool, "cpu-opt", true, cpu_opt)                                                                \
     code(std::string, "pref-path", std::string{}, pref_path)                                            \
     code(bool, "discord-rich-presence", true, discord_rich_presence)                                    \
@@ -108,10 +110,15 @@ enum ScreenshotFormat {
     code(bool, "color-surface-debug", false, color_surface_debug)                                       \
     code(bool, "show-touchpad-cursor", true, show_touchpad_cursor)                                      \
     code(bool, "performance-overlay", false, performance_overlay)                                       \
-    code(int, "performance-overlay-detail", static_cast<int>(MINIMUM), performance_overlay_detail)       \
-    code(int, "performance-overlay-position", static_cast<int>(TOP_LEFT), performance_overlay_position)  \
+    code(int, "performance-overlay-detail", static_cast<int>(MINIMUM), performance_overlay_detail)      \
+    code(int, "performance-overlay-position", static_cast<int>(TOP_LEFT), performance_overlay_position) \
+    code(bool, "enable-gamepad-overlay", true, enable_gamepad_overlay)                                  \
+    code(bool, "overlay-show-touch-switch", false, overlay_show_touch_switch)                           \
+    code(float, "overlay-scale", 1.0f, overlay_scale)                                                   \
+    code(int, "overlay-opacity", 100, overlay_opacity)                                                  \
     code(int, "screenshot-format", static_cast<int>(JPEG), screenshot_format)                           \
     code(bool, "disable-motion", false, disable_motion)                                                 \
+    code(float, "controller-analog-multiplier", 1.0f, controller_analog_multiplier)                     \
     code(int, "keyboard-button-select", 229, keyboard_button_select)                                    \
     code(int, "keyboard-button-start", 40, keyboard_button_start)                                       \
     code(int, "keyboard-button-up", 82, keyboard_button_up)                                             \
@@ -148,6 +155,7 @@ enum ScreenshotFormat {
     code(bool, "display-info-message", false, display_info_message)                                     \
     code(bool, "show-welcome", true, show_welcome)                                                      \
     code(bool, "check-for-updates", true, check_for_updates)                                            \
+    code(int, "file-loading-delay", 0, file_loading_delay)                                              \
     code(bool, "asia-font-support", false, asia_font_support)                                           \
     code(bool, "shader-cache", true, shader_cache)                                                      \
     code(bool, "spirv-shader", false, spirv_shader)                                                     \
@@ -159,6 +167,7 @@ enum ScreenshotFormat {
     code(int, "http-timeout-sleep-ms", 100, http_timeout_sleep_ms)                                      \
     code(int, "http-read-end-attempts", 10, http_read_end_attempts)                                     \
     code(int, "http-read-end-sleep-ms", 250, http_read_end_sleep_ms)                                    \
+    code(int, "adhoc-addr", 0, adhoc_addr)                                                              \
     code(bool, "tracy-primitive-impl", false, tracy_primitive_impl)
 
 // Vector members produced in the config file

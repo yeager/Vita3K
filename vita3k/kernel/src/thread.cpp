@@ -71,7 +71,7 @@ int ThreadState::init(const char *name, Ptr<const void> entry_point, int init_pr
     start_tick = rtc_get_ticks(kernel.base_tick.tick);
     last_vblank_waited = 0;
 
-    cpu = init_cpu(kernel.cpu_backend, kernel.cpu_opt, id, static_cast<std::size_t>(core_num), mem, kernel.cpu_protocol.get());
+    cpu = init_cpu(kernel.cpu_opt, id, static_cast<std::size_t>(core_num), mem, kernel.cpu_protocol.get());
     if (!cpu) {
         return SCE_KERNEL_ERROR_ERROR;
     }
@@ -156,6 +156,7 @@ int ThreadState::start(SceSize arglen, const Ptr<void> argp, bool run_entry_call
         kernel.debugger.wait_for_debugger = false;
     } else {
         to_do = ThreadToDo::run;
+        status = ThreadStatus::run;
     }
     something_to_do.notify_one();
 
@@ -250,17 +251,19 @@ bool ThreadState::run_loop() {
             }
 
             // Run the cpu
-            if (to_do == ThreadToDo::step) {
-                res = step(*cpu);
-                to_do = ThreadToDo::suspend;
+            do {
+                if (to_do == ThreadToDo::step) {
+                    res = step(*cpu);
+                    to_do = ThreadToDo::suspend;
 
-            } else
-                res = run(*cpu);
+                } else
+                    res = run(*cpu);
 
-            // handle svc call if this was what stopped the cpu
-            if (cpu->svc_called) {
-                cpu->protocol->call_svc(*cpu, cpu->svc_called, read_pc(*cpu), *this);
-            }
+                // handle svc call if this was what stopped the cpu
+                if (cpu->svc_called) {
+                    cpu->protocol->call_svc(*cpu, cpu->svc_called, read_pc(*cpu), *this);
+                }
+            } while (to_do == ThreadToDo::run && res == 0 && call_level == run_level && !hit_breakpoint(*cpu));
 
             lock.lock();
 
@@ -299,6 +302,8 @@ bool ThreadState::run_loop() {
             something_to_do.wait(lock);
             break;
         case ThreadToDo::suspend:
+            update_status(ThreadStatus::suspend);
+            something_to_do.wait(lock);
             break;
         }
     }
@@ -413,15 +418,15 @@ void ThreadState::resume(bool step) {
 std::string ThreadState::log_stack_traceback() const {
     constexpr Address START_OFFSET = 0;
     constexpr Address END_OFFSET = 1024;
-    std::stringstream ss;
+    std::string str;
     const Address sp = read_sp(*cpu);
     for (Address addr = sp - START_OFFSET; addr <= sp + END_OFFSET; addr += 4) {
         if (Ptr<uint32_t>(addr).valid(mem)) {
             const Address value = *Ptr<uint32_t>(addr).get(mem);
             const auto mod = kernel.find_module_by_addr(value);
             if (mod)
-                ss << fmt::format("{} (module: {})\n", log_hex(value), mod->module_name);
+                fmt::format_to(std::back_inserter(str), "0x{:X} (module: {})\n", value, mod->module_name);
         }
     }
-    return ss.str();
+    return str;
 }

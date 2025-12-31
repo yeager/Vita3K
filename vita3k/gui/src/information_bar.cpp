@@ -32,7 +32,7 @@
 
 #include <pugixml.hpp>
 
-#include <SDL_power.h>
+#include <SDL3/SDL_power.h>
 #include <stb_image.h>
 
 namespace gui {
@@ -114,7 +114,7 @@ static bool init_notice_icon(GuiState &gui, EmuEnvState &emuenv, const fs::path 
         LOG_ERROR("Invalid icon for notice id: {} in path {}.", info.id, content_path);
         return false;
     }
-    gui.notice_info_icon[info.time].init(gui.imgui_state.get(), data, width, height);
+    gui.notice_info_icon[info.time] = ImGui_Texture(gui.imgui_state.get(), data, width, height);
     stbi_image_free(data);
 
     return gui.notice_info_icon.contains(info.time);
@@ -302,7 +302,7 @@ void update_notice_info(GuiState &gui, EmuEnvState &emuenv, const std::string &t
         const auto &trophy_data = gui.trophy_unlock_display_requests.back();
         info.id = trophy_data.np_com_id;
         info.content_id = trophy_data.trophy_id;
-        info.group = std::to_string(int(trophy_data.trophy_kind));
+        info.group = std::to_string(static_cast<int>(trophy_data.trophy_kind));
     }
     info.type = type;
     info.time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -350,11 +350,11 @@ static std::string get_notice_time(GuiState &gui, EmuEnvState &emuenv, const tim
     } else {
         auto &lang = gui.lang.common.main;
         if (diff_time >= (hour * 2))
-            date = fmt::format(fmt::runtime(lang["hours_ago"]), uint32_t(diff_time / hour));
+            date = fmt::format(fmt::runtime(lang["hours_ago"]), static_cast<uint32_t>(diff_time / hour));
         else if (diff_time >= hour)
             date = lang["one_hour_ago"];
         else if (diff_time >= (minute * 2))
-            date = fmt::format(fmt::runtime(lang["minutes_ago"]), uint32_t(diff_time / 60));
+            date = fmt::format(fmt::runtime(lang["minutes_ago"]), static_cast<uint32_t>(diff_time / 60));
         else
             date = lang["one_minute_ago"];
     }
@@ -478,6 +478,7 @@ static void draw_notice_info(GuiState &gui, EmuEnvState &emuenv) {
                 const auto notice_time_size = ImGui::CalcTextSize(notice_time.c_str());
                 ImGui::SetCursorPos(ImVec2(POPUP_SIZE.x - (34.f * SCALE.x) - notice_time_size.x, ImGui::GetCursorPosY() - (8.f * SCALE.y)));
                 ImGui::TextColored(GUI_COLOR_TEXT, "%s", notice_time.c_str());
+                ImGui::ScrollWhenDragging();
                 ImGui::NextColumn();
             }
             ImGui::Columns(1);
@@ -569,7 +570,7 @@ void draw_information_bar(GuiState &gui, EmuEnvState &emuenv) {
     draw_list->AddRectFilled(VIEWPORT_POS, INFO_BAR_POS_MAX, is_theme_color ? bar_color : DEFAULT_BAR_COLOR, 0.f, ImDrawFlags_RoundCornersAll);
 
     if (gui.vita_area.home_screen || gui.vita_area.live_area_screen) {
-        const auto HOME_ICON_POS_CENTER = VIEWPORT_POS.x + (INFO_BAR_SIZE.x / 2.f) - (32.f * ((float(gui.live_area_current_open_apps_list.size())) / 2.f)) * SCALE.x;
+        const auto HOME_ICON_POS_CENTER = VIEWPORT_POS.x + (INFO_BAR_SIZE.x / 2.f) - (32.f * (static_cast<float>(gui.live_area_current_open_apps_list.size()) / 2.f)) * SCALE.x;
         const auto APP_IS_OPEN = gui.live_area_app_current_open >= 0;
 
         // Draw Home Icon
@@ -590,7 +591,7 @@ void draw_information_bar(GuiState &gui, EmuEnvState &emuenv) {
         draw_list->AddRectFilled(ImVec2(HOME_ICON_POS_CENTER - (3.f * SCALE.x), VIEWPORT_POS.y + (18.5f * SCALE.y)), ImVec2(HOME_ICON_POS_CENTER + (3.f * SCALE.x), VIEWPORT_POS.y + (26.f * SCALE.y)), bar_color);
 
         // Draw App Icon
-        const float decal_app_icon_pos = 34.f * ((float(gui.live_area_current_open_apps_list.size()) - 2) / 2.f);
+        const float decal_app_icon_pos = 34.f * ((static_cast<float>(gui.live_area_current_open_apps_list.size()) - 2) / 2.f);
         const auto ICON_SIZE_SCALE = 28.f * SCALE.x;
 
         for (auto a = 0; a < gui.live_area_current_open_apps_list.size(); a++) {

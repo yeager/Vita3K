@@ -28,7 +28,7 @@
 
 TRACY_MODULE_NAME(SceLibc);
 
-Ptr<void> g_dso;
+static Ptr<void> g_dso;
 
 EXPORT(int, _Assert) {
     TRACY_FUNC(_Assert);
@@ -500,6 +500,9 @@ EXPORT(int, fscanf_s) {
     return UNIMPLEMENTED();
 }
 
+#ifdef fseek
+#undef fseek
+#endif
 EXPORT(int, fseek) {
     TRACY_FUNC(fseek);
     return UNIMPLEMENTED();
@@ -510,6 +513,9 @@ EXPORT(int, fsetpos) {
     return UNIMPLEMENTED();
 }
 
+#ifdef ftell
+#undef ftell
+#endif
 EXPORT(int, ftell) {
     TRACY_FUNC(ftell);
     return UNIMPLEMENTED();
@@ -962,7 +968,7 @@ EXPORT(int, printf, const char *format, module::vargs args) {
     // TODO: add args to tracy func
     std::vector<char> buffer(1024);
 
-    const ThreadStatePtr thread = lock_and_find(thread_id, emuenv.kernel.threads, emuenv.kernel.mutex);
+    const ThreadStatePtr thread = emuenv.kernel.get_thread(thread_id);
 
     if (!thread) {
         return SCE_KERNEL_ERROR_UNKNOWN_THREAD_ID;

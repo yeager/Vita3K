@@ -17,8 +17,6 @@
 
 #include "audio/impl/cubeb_audio.h"
 
-#include <tracy/Tracy.hpp>
-
 #include "kernel/thread/thread_state.h"
 
 #include "util/log.h"
@@ -71,9 +69,7 @@ CubebAudioOutPort::~CubebAudioOutPort() {
 }
 
 CubebAudioAdapter::CubebAudioAdapter(AudioState &audio_state)
-    : AudioAdapter(audio_state) {
-    this->single_stream = false;
-}
+    : AudioAdapter(audio_state) {}
 
 CubebAudioAdapter::~CubebAudioAdapter() {
     if (cubeb_ctx)
@@ -157,7 +153,7 @@ void CubebAudioAdapter::set_volume(AudioOutPort &out_port, float volume) {
 }
 
 void CubebAudioAdapter::switch_state(const bool pause) {
-    for (auto [_, out_port] : state.out_ports) {
+    for (auto &[_, out_port] : state.out_ports) {
         CubebAudioOutPort &port = static_cast<CubebAudioOutPort &>(*out_port);
         if (pause)
             cubeb_stream_stop(port.out_stream);

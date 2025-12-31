@@ -31,9 +31,7 @@ namespace gui {
 void draw_firmware_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
     static std::string fw_version;
     static bool delete_pup_file;
-    static std::filesystem::path pup_path = "";
-
-    host::dialog::filesystem::Result result = host::dialog::filesystem::Result::CANCEL;
+    static fs::path pup_path{};
 
     static std::mutex install_mutex;
     static bool draw_file_dialog = true;
@@ -56,13 +54,13 @@ void draw_firmware_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
     ImGui::SetNextWindowPos(ImVec2(emuenv.logical_viewport_pos.x + (display_size.x / 2.f) - (WINDOW_SIZE.x / 2), emuenv.logical_viewport_pos.y + (display_size.y / 2.f) - (WINDOW_SIZE.y / 2.f)), ImGuiCond_Always);
     ImGui::SetNextWindowSize(WINDOW_SIZE);
     if (draw_file_dialog) {
-        result = host::dialog::filesystem::open_file(pup_path, { { "PlayStation Vita Firmware Package", { "PUP" } } });
+        auto result = host::dialog::filesystem::open_file(pup_path, { { "PlayStation Vita Firmware Package", { "PUP" } } });
         draw_file_dialog = false;
         finished_installing = false;
 
         if (result == host::dialog::filesystem::Result::SUCCESS) {
             std::thread installation([&emuenv]() {
-                fw_version = install_pup(emuenv.pref_path, fs::path(pup_path.native()), progress_callback);
+                fw_version = install_pup(emuenv.pref_path, pup_path, progress_callback);
                 std::lock_guard<std::mutex> lock(install_mutex);
                 finished_installing = true;
             });
@@ -113,19 +111,21 @@ void draw_firmware_install_dialog(GuiState &gui, EmuEnvState &emuenv) {
             const auto fw_font_package{ emuenv.pref_path / "sa0" };
             if (!fs::exists(fw_font_package) || fs::is_empty(fw_font_package)) {
                 ImGui::TextColored(GUI_COLOR_TEXT, "%s", lang["no_font_exist"].c_str());
-                if (ImGui::Button(lang["download_firmware_font_package"].c_str()))
+                if (ImGui::Button(gui.lang.welcome["download_firmware_font_package"].c_str()))
                     open_path("https://bit.ly/2P2rb0r");
                 SetTooltipEx(lang["firmware_font_package_description"].c_str());
                 ImGui::Spacing();
                 ImGui::Separator();
                 ImGui::Spacing();
             }
+#ifndef __ANDROID__
             ImGui::Checkbox(lang["delete_firmware"].c_str(), &delete_pup_file);
             ImGui::Spacing();
+#endif
             ImGui::SetCursorPos(ImVec2(POS_BUTTON, ImGui::GetWindowSize().y - BUTTON_SIZE.y - (20.f * SCALE.y)));
             if (ImGui::Button(common["ok"].c_str(), BUTTON_SIZE)) {
                 if (delete_pup_file) {
-                    fs::remove(fs::path(pup_path.native()));
+                    fs::remove(pup_path);
                     delete_pup_file = false;
                 }
                 get_modules_list(gui, emuenv);

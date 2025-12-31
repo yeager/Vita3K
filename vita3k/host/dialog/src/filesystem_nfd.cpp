@@ -42,7 +42,7 @@
  * @param file_extensions_list File extensions list
  * @return std::string A string containing the properly formatted file extension list
  */
-std::string format_file_filter_extension_list(const std::vector<std::string> &file_extensions_list) {
+static std::string format_file_filter_extension_list(const std::vector<std::string> &file_extensions_list) {
     // Formatted string containing the properly formatted file extension list
     //
     // In the case of nativefiledialog, the expected file extension is a single
@@ -55,9 +55,9 @@ std::string format_file_filter_extension_list(const std::vector<std::string> &fi
     for (size_t index = 0; index < file_extensions_list.size(); index++) {
         // Don't add comma before the first file extension
         if (index == 0) {
-            formatted_string += file_extensions_list.at(index);
+            formatted_string += file_extensions_list[index];
         } else {
-            formatted_string += "," + file_extensions_list.at(index);
+            formatted_string += "," + file_extensions_list[index];
         }
     }
 
@@ -65,7 +65,7 @@ std::string format_file_filter_extension_list(const std::vector<std::string> &fi
 }
 
 namespace host::dialog::filesystem {
-Result open_file(std::filesystem::path &resulting_path, const std::vector<FileFilter> &file_filters, const std::filesystem::path &default_path) {
+Result open_file(fs::path &resulting_path, const std::vector<FileFilter> &file_filters, const fs::path &default_path) {
     // Initialize NFD
     NFD::Guard nfd_guard;
 
@@ -108,12 +108,12 @@ Result open_file(std::filesystem::path &resulting_path, const std::vector<FileFi
     // For every file filter in file_filters vector
     for (const FileFilter &file_filter : file_filters) {
         // Format file extension list and store the result
-        file_extensions_converted.push_back(format_file_filter_extension_list(file_filter.file_extensions));
+        file_extensions_converted.emplace_back(format_file_filter_extension_list(file_filter.file_extensions));
 
         // Convert filter and append to the list
         // File filter names can be used as they are, but the pointers of the
         // file extension lists have to point to the formatted strings
-        file_filters_converted.push_back({ file_filter.display_name.c_str(), file_extensions_converted.at(file_extensions_converted.size() - 1).c_str() });
+        file_filters_converted.push_back({ file_filter.display_name.c_str(), file_extensions_converted[file_extensions_converted.size() - 1].c_str() });
     }
 
     /* --- Then nativefiledialog can be called --- */
@@ -124,10 +124,9 @@ Result open_file(std::filesystem::path &resulting_path, const std::vector<FileFi
     }
 
     // If the default path isn't empty, specify the pointer to the default path string
-    const std::u8string default_path_u8 = default_path.u8string();
-    if (default_path != "") {
-        arguments.defaultPath = reinterpret_cast<const nfdu8char_t *>(default_path_u8.c_str());
-    }
+    const std::string default_path_u8 = fs_utils::path_to_utf8(default_path);
+    if (!default_path.empty())
+        arguments.defaultPath = default_path_u8.c_str();
 
     // Set the amount of filters to be input
     arguments.filterCount = (unsigned int)file_filters_converted.size();
@@ -143,7 +142,7 @@ Result open_file(std::filesystem::path &resulting_path, const std::vector<FileFi
     case NFD_OKAY:
         // Resolve differences between `char *` (nativefiledialog-extended) and `std::string &` (Vita3K)
         // by turning the C char array into a C++ string
-        resulting_path.assign(reinterpret_cast<const char8_t *>(arguments.outPath.get()));
+        resulting_path = fs_utils::utf8_to_path(arguments.outPath.get());
 
         return Result::SUCCESS;
     case NFD_CANCEL:
@@ -153,7 +152,7 @@ Result open_file(std::filesystem::path &resulting_path, const std::vector<FileFi
     }
 }
 
-Result pick_folder(std::filesystem::path &resulting_path, const std::filesystem::path &default_path) {
+Result pick_folder(fs::path &resulting_path, const fs::path &default_path) {
     // Initialize NFD
     NFD::Guard nfd_guard;
 
@@ -171,10 +170,9 @@ Result pick_folder(std::filesystem::path &resulting_path, const std::filesystem:
     } arguments;
 
     // If the default path isn't empty, specify the pointer to the default path string
-    const std::u8string default_path_u8 = default_path.u8string();
-    if (default_path != "") {
-        arguments.defaultPath = reinterpret_cast<const nfdu8char_t *>(default_path_u8.c_str());
-    }
+    const std::string default_path_u8 = fs_utils::path_to_utf8(default_path);
+    if (!default_path.empty())
+        arguments.defaultPath = default_path_u8.c_str();
 
     // Call nfd to invoke explorer window and store result code
     nfdresult_t result = NFD::PickFolder(arguments.outPath, arguments.defaultPath);
@@ -186,7 +184,7 @@ Result pick_folder(std::filesystem::path &resulting_path, const std::filesystem:
     case NFD_OKAY:
         // Resolve differences between `char *` (nativefiledialog) and `std::string &` (Vita3K)
         // by turning the C char array into a C++ string
-        resulting_path.assign(reinterpret_cast<const char8_t *>(arguments.outPath.get()));
+        resulting_path = fs_utils::utf8_to_path(arguments.outPath.get());
 
         return Result::SUCCESS;
     case NFD_CANCEL:
@@ -203,6 +201,16 @@ std::string get_error() {
     error.assign(NFD::GetError());
 
     return error;
+}
+
+FILE *resolve_host_handle(const fs::path &path) {
+    FILE *result;
+#ifdef _WIN32
+    _wfopen_s(&result, path.c_str(), L"rb");
+#else
+    result = fopen(path.c_str(), "rb");
+#endif
+    return result;
 }
 
 } // namespace host::dialog::filesystem

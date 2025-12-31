@@ -17,10 +17,12 @@
 
 #pragma once
 
+#ifdef __APPLE__
+#define VK_ENABLE_BETA_EXTENSIONS
+#endif
 #define VK_NO_PROTOTYPES
 #define VULKAN_HPP_NO_CONSTRUCTORS
 #define VULKAN_HPP_NO_SPACESHIP_OPERATOR
-#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #include <vulkan/vulkan.hpp>
 
 #include <gxm/types.h>

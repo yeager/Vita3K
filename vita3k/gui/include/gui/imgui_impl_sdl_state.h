@@ -20,6 +20,8 @@
 #include <imgui.h>
 
 #include <cstdint>
+#include <mutex>
+#include <vector>
 
 struct SDL_Window;
 struct SDL_Cursor;
@@ -33,19 +35,20 @@ struct ImGui_State {
     renderer::State *renderer{};
 
     uint64_t time = 0;
-    int mouse_buttons_down;
-    SDL_Cursor *mouse_cursors[ImGuiMouseCursor_COUNT];
-    int pending_mouse_leave_frame;
-    bool mouse_can_use_global_state;
+    int mouse_buttons_down = 0;
+    SDL_Cursor *mouse_cursors[ImGuiMouseCursor_COUNT] = {};
+    int pending_mouse_leave_frame = 0;
+    bool mouse_can_use_global_state = false;
 
     bool init = false;
-    bool is_typing;
+    bool is_typing = false;
     bool do_clear_screen = true;
 
-    ImGui_State() {
-        memset((void *)this, 0, sizeof(*this));
-        do_clear_screen = true;
-    }
+    std::mutex textures_to_free_mutex;
+    std::vector<ImTextureID> textures_to_free;
+
+    ImGui_State() = default;
+
     virtual ~ImGui_State() = default;
 };
 
@@ -57,13 +60,11 @@ public:
     ImGui_Texture() = default;
     ImGui_Texture(ImGui_State *new_state, void *data, int width, int height);
     ImGui_Texture(ImGui_Texture &&texture) noexcept;
-
-    void init(ImGui_State *new_state, ImTextureID texture);
-    void init(ImGui_State *new_state, void *data, int width, int height);
+    ImGui_Texture(const ImGui_Texture &) = delete;
 
     operator bool() const;
     operator ImTextureID() const;
-    bool operator==(const ImGui_Texture &texture);
+    bool operator==(const ImGui_Texture &texture) const;
 
     ImGui_Texture &operator=(ImGui_Texture &&texture) noexcept;
     ImGui_Texture &operator=(const ImGui_Texture &texture) = delete;

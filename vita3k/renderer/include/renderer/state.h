@@ -31,6 +31,14 @@ struct DisplayState;
 struct GxmState;
 struct Config;
 
+enum struct MappingMethod : int {
+    Disabled,
+    DoubleBuffer,
+    ExernalHost,
+    PageTable,
+    NativeBuffer
+};
+
 namespace renderer {
 
 class TextureCache;
@@ -52,10 +60,15 @@ struct State {
     fs::path shaders_log_path;
 
     Backend current_backend;
+#ifdef __ANDROID__
+    std::string current_custom_driver;
+#endif
     FeatureState features;
     float res_multiplier;
     bool disable_surface_sync;
     bool stretch_the_display_area;
+    bool fullscreen_hd_res_pixel_perfect;
+    bool fullscreen = false;
 
     Context *context;
 
@@ -78,7 +91,13 @@ struct State {
 
     bool should_display;
 
-    bool need_page_table = false;
+    // only support disabled by default
+    int supported_mapping_methods_mask = 1;
+    MappingMethod mapping_method = MappingMethod::Disabled;
+
+    // used for driver bug workaround
+    bool is_adreno_stock = false;
+    bool is_adreno_turnip = false;
 
     virtual bool init() = 0;
     virtual void late_init(const Config &cfg, const std::string_view game_id, MemState &mem) = 0;
@@ -108,12 +127,27 @@ struct State {
     void set_stretch_display(bool enable) {
         stretch_the_display_area = enable;
     }
+    void stretch_hd_pixel_perfect(bool enable) {
+        fullscreen_hd_res_pixel_perfect = enable;
+    }
+    void set_fullscreen(bool enable) {
+        fullscreen = enable;
+    }
     virtual bool map_memory(MemState &mem, Ptr<void> address, uint32_t size) {
         return true;
     }
     virtual void unmap_memory(MemState &mem, Ptr<void> address) {}
     virtual std::vector<std::string> get_gpu_list() {
         return { "Automatic" };
+    }
+#ifdef __ANDROID__
+    virtual bool support_custom_drivers() {
+        return false;
+    }
+    virtual void set_turbo_mode(bool set) {}
+#endif
+    virtual uint32_t get_gpu_version() {
+        return 0;
     }
 
     virtual std::string_view get_gpu_name() = 0;

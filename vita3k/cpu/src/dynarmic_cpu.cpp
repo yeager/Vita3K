@@ -25,6 +25,7 @@
 
 #include <dynarmic/frontend/A32/a32_ir_emitter.h>
 #include <dynarmic/interface/A32/coprocessor.h>
+#include <dynarmic/interface/exclusive_monitor.h>
 
 #include <memory>
 #include <optional>
@@ -313,6 +314,7 @@ std::unique_ptr<Dynarmic::A32::Jit> DynarmicCPU::make_jit() {
     config.coprocessors[15] = cp15;
     config.processor_id = core_id;
     config.optimizations = cpu_opt ? Dynarmic::all_safe_optimizations : Dynarmic::no_optimizations;
+    config.enable_cycle_counting = false;
 
     return std::make_unique<Dynarmic::A32::Jit>(config);
 }
@@ -334,7 +336,11 @@ int DynarmicCPU::run() {
     break_ = false;
     exit_request = false;
     parent->svc_called = false;
-    jit->Run();
+    Dynarmic::HaltReason halt_reason;
+    do {
+        halt_reason = jit->Run();
+    } while ((halt_reason == Dynarmic::HaltReason::Step) || (halt_reason == Dynarmic::HaltReason::CacheInvalidation));
+
     return halted;
 }
 

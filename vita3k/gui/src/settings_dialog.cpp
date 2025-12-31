@@ -15,7 +15,6 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-#include "imgui.h"
 #include "private.h"
 
 #include <app/functions.h>
@@ -30,6 +29,7 @@
 #include <lang/functions.h>
 #include <renderer/state.h>
 #include <renderer/texture_cache.h>
+#include <util/string_utils.h>
 
 #include <gui/functions.h>
 #include <gui/state.h>
@@ -39,11 +39,13 @@
 #include <string>
 #include <util/fs.h>
 #include <util/log.h>
+#include <util/net_utils.h>
 
-#include <SDL.h>
+#include <SDL3/SDL_video.h>
 
 #include <algorithm>
 #include <pugixml.hpp>
+#include <util/vector_utils.h>
 
 #undef ERROR
 
@@ -106,12 +108,12 @@ static void reset_emulator(GuiState &gui, EmuEnvState &emuenv) {
 }
 
 static void change_emulator_path(GuiState &gui, EmuEnvState &emuenv) {
-    std::filesystem::path emulator_path = "";
+    fs::path emulator_path{};
     host::dialog::filesystem::Result result = host::dialog::filesystem::pick_folder(emulator_path);
 
-    if (result == host::dialog::filesystem::Result::SUCCESS && emulator_path.native() != emuenv.pref_path.native()) {
+    if (result == host::dialog::filesystem::Result::SUCCESS && emulator_path != emuenv.pref_path) {
         // Refresh the working paths
-        emuenv.pref_path = fs::path(emulator_path.native()) / "";
+        emuenv.pref_path = emulator_path / "";
 
         // TODO: Move app old to new path
         reset_emulator(gui, emuenv);
@@ -122,8 +124,6 @@ static void change_emulator_path(GuiState &gui, EmuEnvState &emuenv) {
         LOG_CRITICAL("Error initializing file dialog: {}", host::dialog::filesystem::get_error());
     }
 }
-
-static CPUBackend config_cpu_backend;
 
 /**
  * @brief Set up `config` with the values contained in the custom config file of a certain PlayStation Vita application
@@ -139,7 +139,7 @@ static CPUBackend config_cpu_backend;
  * @return false A custom config for the application has not been found or a custom config has been found
  * but it's corrupted or invalid.
  */
-static bool get_custom_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path) {
+static bool get_custom_config(EmuEnvState &emuenv, const std::string &app_path) {
     const auto CUSTOM_CONFIG_PATH{ emuenv.config_path / "config" / fmt::format("config_{}.xml", app_path) };
 
     if (fs::exists(CUSTOM_CONFIG_PATH)) {
@@ -160,17 +160,21 @@ static bool get_custom_config(GuiState &gui, EmuEnvState &emuenv, const std::str
             // Load CPU Config
             if (!config_child.child("cpu").empty()) {
                 const auto cpu_child = config_child.child("cpu");
-                config.cpu_backend = cpu_child.attribute("cpu-backend").as_string();
                 config.cpu_opt = cpu_child.attribute("cpu-opt").as_bool();
             }
 
             // Load GPU Config
             if (!config_child.child("gpu").empty()) {
                 const auto gpu_child = config_child.child("gpu");
+                config.backend_renderer = gpu_child.attribute("backend-renderer").as_string();
+#ifdef __ANDROID__
+                config.custom_driver_name = gpu_child.attribute("custom-driver-name").as_string();
+#endif
                 config.high_accuracy = gpu_child.attribute("high-accuracy").as_bool();
                 config.resolution_multiplier = gpu_child.attribute("resolution-multiplier").as_float();
                 config.disable_surface_sync = gpu_child.attribute("disable-surface-sync").as_bool();
                 config.screen_filter = gpu_child.attribute("screen-filter").as_string();
+                config.memory_mapping = gpu_child.attribute("memory-mapping").as_string();
                 config.v_sync = gpu_child.attribute("v-sync").as_bool();
                 config.anisotropic_filtering = gpu_child.attribute("anisotropic-filtering").as_int();
                 config.async_pipeline_compilation = gpu_child.attribute("async-pipeline-compilation").as_bool();
@@ -196,6 +200,7 @@ static bool get_custom_config(GuiState &gui, EmuEnvState &emuenv, const std::str
             if (!config_child.child("emulator").empty()) {
                 const auto emulator_child = config_child.child("emulator");
                 config.show_touchpad_cursor = emulator_child.attribute("show-touchpad-cursor").as_bool();
+                config.file_loading_delay = emulator_child.attribute("file-loading-delay").as_int();
             }
 
             // Load Network Config
@@ -215,8 +220,15 @@ static bool get_custom_config(GuiState &gui, EmuEnvState &emuenv, const std::str
     return false;
 }
 
-static CPUBackend set_cpu_backend(std::string &cpu_backend) {
-    return cpu_backend == "Dynarmic" ? CPUBackend::Dynarmic : CPUBackend::Unicorn;
+static void set_backend_renderer(EmuEnvState &emuenv, const std::string &backend_renderer) {
+#ifndef __APPLE__
+    if (string_utils::toupper(backend_renderer) == "OPENGL")
+        emuenv.backend_renderer = renderer::Backend::OpenGL;
+    else
+        emuenv.backend_renderer = renderer::Backend::Vulkan;
+#else
+    emuenv.backend_renderer = renderer::Backend::Vulkan;
+#endif
 }
 
 static int current_aniso_filter_log, max_aniso_filter_log, audio_backend_idx, current_user_lang;
@@ -232,15 +244,19 @@ static std::vector<std::string> list_user_lang;
 void init_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path) {
     // If no app-specific config file is being used for the initialized application,
     // set up `config` with the values set in the global emulator configuration
-    if (!get_custom_config(gui, emuenv, app_path)) {
-        config.cpu_backend = emuenv.cfg.cpu_backend;
+    if (!get_custom_config(emuenv, app_path)) {
         config.cpu_opt = emuenv.cfg.cpu_opt;
         config.modules_mode = emuenv.cfg.modules_mode;
         config.lle_modules = emuenv.cfg.lle_modules;
+        config.backend_renderer = emuenv.cfg.backend_renderer;
+#ifdef __ANDROID__
+        config.custom_driver_name = emuenv.cfg.custom_driver_name;
+#endif
         config.high_accuracy = emuenv.cfg.high_accuracy;
         config.resolution_multiplier = emuenv.cfg.resolution_multiplier;
         config.disable_surface_sync = emuenv.cfg.disable_surface_sync;
         config.screen_filter = emuenv.cfg.screen_filter;
+        config.memory_mapping = emuenv.cfg.memory_mapping;
         config.v_sync = emuenv.cfg.v_sync;
         config.anisotropic_filtering = emuenv.cfg.anisotropic_filtering;
         config.async_pipeline_compilation = emuenv.cfg.async_pipeline_compilation;
@@ -252,8 +268,11 @@ void init_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path
         config.ngs_enable = emuenv.cfg.ngs_enable;
         config.pstv_mode = emuenv.cfg.pstv_mode;
         config.show_touchpad_cursor = emuenv.cfg.show_touchpad_cursor;
+        config.file_loading_delay = emuenv.cfg.file_loading_delay;
         config.psn_signed_in = emuenv.cfg.psn_signed_in;
     }
+
+    set_backend_renderer(emuenv, config.backend_renderer);
 
     list_user_lang.clear();
     const auto get_list_user_lang = [&](const fs::path &path) {
@@ -265,15 +284,19 @@ void init_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path
         }
     };
 
+#ifndef __ANDROID__
     get_list_user_lang(emuenv.static_assets_path);
     if (emuenv.static_assets_path != emuenv.shared_path)
         get_list_user_lang(emuenv.shared_path);
+#else
+    list_user_lang.insert(list_user_lang.end(), { "id", "ms", "ua" });
+#endif
 
     current_user_lang = emuenv.cfg.user_lang.empty() ? 0 : (vector_utils::find_index(list_user_lang, emuenv.cfg.user_lang) + 1);
 
     get_modules_list(gui, emuenv);
     config.stretch_the_display_area = emuenv.cfg.stretch_the_display_area;
-    config_cpu_backend = set_cpu_backend(config.cpu_backend);
+    config.fullscreen_hd_res_pixel_perfect = emuenv.cfg.fullscreen_hd_res_pixel_perfect;
     current_aniso_filter_log = static_cast<int>(log2f(static_cast<float>(config.anisotropic_filtering)));
     max_aniso_filter_log = static_cast<int>(log2f(static_cast<float>(emuenv.renderer->get_max_anisotropic_filtering())));
     audio_backend_idx = (emuenv.cfg.audio_backend == "SDL") ? 0 : 1;
@@ -315,15 +338,19 @@ static void save_config(GuiState &gui, EmuEnvState &emuenv) {
 
         // CPU
         auto cpu_child = config_child.append_child("cpu");
-        cpu_child.append_attribute("cpu-backend") = config.cpu_backend.c_str();
         cpu_child.append_attribute("cpu-opt") = config.cpu_opt;
 
         // GPU
         auto gpu_child = config_child.append_child("gpu");
+        gpu_child.append_attribute("backend-renderer") = config.backend_renderer.c_str();
+#ifdef __ANDROID__
+        gpu_child.append_attribute("custom-driver-name") = config.custom_driver_name.c_str();
+#endif
         gpu_child.append_attribute("high-accuracy") = config.high_accuracy;
         gpu_child.append_attribute("resolution-multiplier") = config.resolution_multiplier;
         gpu_child.append_attribute("disable-surface-sync") = config.disable_surface_sync;
         gpu_child.append_attribute("screen-filter") = config.screen_filter.c_str();
+        gpu_child.append_attribute("memory-mapping") = config.memory_mapping.c_str();
         gpu_child.append_attribute("v-sync") = config.v_sync;
         gpu_child.append_attribute("anisotropic-filtering") = config.anisotropic_filtering;
         gpu_child.append_attribute("async-pipeline-compilation") = config.async_pipeline_compilation;
@@ -344,6 +371,7 @@ static void save_config(GuiState &gui, EmuEnvState &emuenv) {
         // Emulator
         auto emulator_child = config_child.append_child("emulator");
         emulator_child.append_attribute("show-touchpad-cursor") = config.show_touchpad_cursor;
+        emulator_child.append_attribute("file-loading-delay") = config.file_loading_delay;
 
         // Network
         auto network_child = config_child.append_child("network");
@@ -353,14 +381,18 @@ static void save_config(GuiState &gui, EmuEnvState &emuenv) {
         if (!save_xml)
             LOG_ERROR("Failed to save custom config xml for app path: {}, in path: {}", emuenv.app_path, CONFIG_PATH);
     } else {
-        emuenv.cfg.cpu_backend = config.cpu_backend;
         emuenv.cfg.cpu_opt = config.cpu_opt;
         emuenv.cfg.modules_mode = config.modules_mode;
         emuenv.cfg.lle_modules = config.lle_modules;
+        emuenv.cfg.backend_renderer = config.backend_renderer;
+#ifdef __ANDROID__
+        emuenv.cfg.custom_driver_name = config.custom_driver_name;
+#endif
         emuenv.cfg.high_accuracy = config.high_accuracy;
         emuenv.cfg.resolution_multiplier = config.resolution_multiplier;
         emuenv.cfg.disable_surface_sync = config.disable_surface_sync;
         emuenv.cfg.screen_filter = config.screen_filter;
+        emuenv.cfg.memory_mapping = config.memory_mapping;
         emuenv.cfg.v_sync = config.v_sync;
         emuenv.cfg.anisotropic_filtering = config.anisotropic_filtering;
         emuenv.cfg.async_pipeline_compilation = config.async_pipeline_compilation;
@@ -372,28 +404,32 @@ static void save_config(GuiState &gui, EmuEnvState &emuenv) {
         emuenv.cfg.ngs_enable = config.ngs_enable;
         emuenv.cfg.pstv_mode = config.pstv_mode;
         emuenv.cfg.show_touchpad_cursor = config.show_touchpad_cursor;
+        emuenv.cfg.file_loading_delay = config.file_loading_delay;
         emuenv.cfg.psn_signed_in = config.psn_signed_in;
+    }
+
+    bool update_viewport_en = false;
+
+    if (emuenv.cfg.fullscreen_hd_res_pixel_perfect != config.fullscreen_hd_res_pixel_perfect) {
+        emuenv.cfg.fullscreen_hd_res_pixel_perfect = config.fullscreen_hd_res_pixel_perfect;
+        update_viewport_en = true;
     }
 
     if (emuenv.cfg.stretch_the_display_area != config.stretch_the_display_area) {
         emuenv.cfg.stretch_the_display_area = config.stretch_the_display_area;
-        app::update_viewport(emuenv);
+        update_viewport_en = true;
     }
 
+    if (update_viewport_en)
+        app::update_viewport(emuenv);
+
     config::serialize_config(emuenv.cfg, emuenv.cfg.config_path);
-}
-
-std::string get_cpu_backend(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path) {
-    if (!get_custom_config(gui, emuenv, app_path))
-        return emuenv.cfg.cpu_backend;
-
-    return config.cpu_backend;
 }
 
 static void set_vsync_state(const bool &state) {
     if (state) {
         // Try adaptive vsync first, falling back to regular vsync.
-        if (SDL_GL_SetSwapInterval(-1) < 0) {
+        if (!SDL_GL_SetSwapInterval(-1)) {
             SDL_GL_SetSwapInterval(1);
         }
     } else
@@ -402,30 +438,25 @@ static void set_vsync_state(const bool &state) {
     LOG_INFO("V-Sync state: {}", state);
 }
 
-/**
- * @brief Set up the config parameters on the emulated PlayStation Vita environment
- * that are susceptible to vary via app-specific config files with the proper values
- * depending on whether app-specific config files are being used or not.
- *
- * @param gui State of the Vita3K GUI
- * @param emuenv State of the emulated PlayStation Vita environment
- * @param app_path Path to the app or game to get the custom config for
- */
-void set_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path) {
+void set_current_config(EmuEnvState &emuenv, const std::string &app_path) {
     // If a config file is in use, call `get_custom_config()` and set the config
     // parameters with the values stored in the app-specific custom config file
-    if (get_custom_config(gui, emuenv, app_path))
+    if (!app_path.empty() && get_custom_config(emuenv, app_path))
         emuenv.cfg.current_config = config;
     else {
         // Else inherit the values from the global emulator config
-        emuenv.cfg.current_config.cpu_backend = emuenv.cfg.cpu_backend;
         emuenv.cfg.current_config.cpu_opt = emuenv.cfg.cpu_opt;
         emuenv.cfg.current_config.modules_mode = emuenv.cfg.modules_mode;
         emuenv.cfg.current_config.lle_modules = emuenv.cfg.lle_modules;
+        emuenv.cfg.current_config.backend_renderer = emuenv.cfg.backend_renderer;
+#ifdef __ANDROID__
+        emuenv.cfg.current_config.custom_driver_name = emuenv.cfg.custom_driver_name;
+#endif
         emuenv.cfg.current_config.high_accuracy = emuenv.cfg.high_accuracy;
         emuenv.cfg.current_config.resolution_multiplier = emuenv.cfg.resolution_multiplier;
         emuenv.cfg.current_config.disable_surface_sync = emuenv.cfg.disable_surface_sync;
         emuenv.cfg.current_config.screen_filter = emuenv.cfg.screen_filter;
+        emuenv.cfg.current_config.memory_mapping = emuenv.cfg.memory_mapping;
         emuenv.cfg.current_config.v_sync = emuenv.cfg.v_sync;
         emuenv.cfg.current_config.anisotropic_filtering = emuenv.cfg.anisotropic_filtering;
         emuenv.cfg.current_config.async_pipeline_compilation = emuenv.cfg.async_pipeline_compilation;
@@ -437,11 +468,30 @@ void set_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path)
         emuenv.cfg.current_config.ngs_enable = emuenv.cfg.ngs_enable;
         emuenv.cfg.current_config.pstv_mode = emuenv.cfg.pstv_mode;
         emuenv.cfg.current_config.show_touchpad_cursor = emuenv.cfg.show_touchpad_cursor;
+        emuenv.cfg.current_config.file_loading_delay = emuenv.cfg.file_loading_delay;
         emuenv.cfg.current_config.psn_signed_in = emuenv.cfg.psn_signed_in;
     }
 
+    set_backend_renderer(emuenv, emuenv.cfg.current_config.backend_renderer);
+}
+
+/**
+ * @brief Set up the config parameters on the emulated PlayStation Vita environment
+ * that are susceptible to vary via app-specific config files with the proper values
+ * depending on whether app-specific config files are being used or not.
+ *
+ * @param emuenv State of the emulated PlayStation Vita environment
+ * @param app_path Path to the app or game to get the custom config for
+ */
+void set_config(EmuEnvState &emuenv) {
+    set_current_config(emuenv, emuenv.io.app_path);
+
     // If backend render or resolution multiplier is changed when app run, reboot emu and app
-    if (!emuenv.io.title_id.empty() && ((emuenv.renderer->current_backend != emuenv.backend_renderer) || (emuenv.renderer->res_multiplier != emuenv.cfg.current_config.resolution_multiplier))) {
+    if (!emuenv.io.title_id.empty() && ((emuenv.renderer->current_backend != emuenv.backend_renderer)
+#ifdef __ANDROID__
+            || (emuenv.renderer->current_custom_driver != emuenv.cfg.current_config.custom_driver_name)
+#endif
+            || (emuenv.renderer->res_multiplier != emuenv.cfg.current_config.resolution_multiplier))) {
         emuenv.load_exec = true;
         emuenv.load_app_path = emuenv.io.app_path;
         emuenv.load_exec_path = emuenv.self_path;
@@ -455,20 +505,22 @@ void set_config(GuiState &gui, EmuEnvState &emuenv, const std::string &app_path)
     emuenv.renderer->set_screen_filter(emuenv.cfg.current_config.screen_filter);
     if (emuenv.renderer->current_backend == renderer::Backend::OpenGL)
         set_vsync_state(emuenv.cfg.current_config.v_sync);
+#ifdef __ANDROID__
+    if (emuenv.renderer->support_custom_drivers())
+        emuenv.renderer->set_turbo_mode(emuenv.cfg.turbo_mode);
+#endif
 
     emuenv.renderer->res_multiplier = emuenv.cfg.current_config.resolution_multiplier;
     emuenv.renderer->set_anisotropic_filtering(emuenv.cfg.current_config.anisotropic_filtering);
     emuenv.renderer->set_stretch_display(emuenv.cfg.stretch_the_display_area);
+    emuenv.renderer->stretch_hd_pixel_perfect(emuenv.cfg.fullscreen_hd_res_pixel_perfect);
     emuenv.renderer->get_texture_cache()->set_replacement_state(emuenv.cfg.current_config.import_textures, emuenv.cfg.current_config.export_textures, emuenv.cfg.current_config.export_as_png);
     emuenv.renderer->set_async_compilation(emuenv.cfg.current_config.async_pipeline_compilation);
     emuenv.display.fps_hack = emuenv.cfg.current_config.fps_hack;
 
     // No change it if app already running
-    if (emuenv.io.title_id.empty()) {
-        emuenv.kernel.cpu_backend = set_cpu_backend(emuenv.cfg.current_config.cpu_backend);
+    if (emuenv.io.title_id.empty())
         emuenv.kernel.cpu_opt = emuenv.cfg.current_config.cpu_opt;
-        emuenv.audio.set_backend(emuenv.cfg.audio_backend);
-    }
 
     emuenv.audio.set_global_volume(emuenv.cfg.current_config.audio_volume / 100.f);
 }
@@ -479,7 +531,7 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
     const auto SCALE = ImVec2(RES_SCALE.x * emuenv.manual_dpi_scale, RES_SCALE.y * emuenv.manual_dpi_scale);
 
     auto &lang = gui.lang.settings_dialog;
-    auto &common = emuenv.common_dialog.lang.common;
+    auto &common = emuenv.common_dialog.lang;
     auto &firmware_font = gui.lang.install_dialog.firmware_install;
 
     ImGui::PushStyleColor(ImGuiCol_Text, GUI_COLOR_TEXT_MENUBAR);
@@ -559,17 +611,8 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
     if (ImGui::BeginTabItem("CPU")) {
         ImGui::PopStyleColor();
         ImGui::Spacing();
-        static const char *LIST_CPU_BACKEND[] = { "Dynarmic", "Unicorn" };
-        const char *LIST_CPU_BACKEND_DISPLAY[] = { "Dynarmic", lang.cpu["unicorn"].c_str() };
-        ImGui::TextColored(GUI_COLOR_TEXT_TITLE, "%s", lang.cpu["cpu_backend"].c_str());
-        if (ImGui::Combo("##cpu_backend", reinterpret_cast<int *>(&config_cpu_backend), LIST_CPU_BACKEND_DISPLAY, IM_ARRAYSIZE(LIST_CPU_BACKEND_DISPLAY)))
-            config.cpu_backend = LIST_CPU_BACKEND[int(config_cpu_backend)];
-        SetTooltipEx(lang.cpu["select_cpu_backend"].c_str());
-        if (config_cpu_backend == CPUBackend::Dynarmic) {
-            ImGui::Spacing();
-            ImGui::Checkbox(lang.cpu["cpu_opt"].c_str(), &config.cpu_opt);
-            SetTooltipEx(lang.cpu["cpu_opt_description"].c_str());
-        }
+        ImGui::Checkbox(lang.cpu["cpu_opt"].c_str(), &config.cpu_opt);
+        SetTooltipEx(lang.cpu["cpu_opt_description"].c_str());
         ImGui::EndTabItem();
     } else
         ImGui::PopStyleColor();
@@ -585,7 +628,7 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
 #endif
         static const char *LIST_BACKEND_RENDERER[] = { "OpenGL", "Vulkan" };
         if (ImGui::Combo(lang.gpu["backend_renderer"].c_str(), reinterpret_cast<int *>(&emuenv.backend_renderer), LIST_BACKEND_RENDERER, IM_ARRAYSIZE(LIST_BACKEND_RENDERER)))
-            emuenv.cfg.backend_renderer = LIST_BACKEND_RENDERER[int(emuenv.backend_renderer)];
+            config.backend_renderer = LIST_BACKEND_RENDERER[static_cast<int>(emuenv.backend_renderer)];
         SetTooltipEx(lang.gpu["select_backend_renderer"].c_str());
 #ifdef __APPLE__
         ImGui::EndDisabled();
@@ -595,7 +638,8 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
 
         const bool is_vulkan = (emuenv.backend_renderer == renderer::Backend::Vulkan);
         const bool is_ingame = !emuenv.io.title_id.empty();
-        if (is_vulkan) {
+        const bool is_renderer_changed = (emuenv.backend_renderer != emuenv.renderer->current_backend);
+        if (is_vulkan && !is_renderer_changed) {
             const std::vector<std::string> gpu_list_str = emuenv.renderer->get_gpu_list();
             // must convert to a vector of char*
             std::vector<const char *> gpu_list;
@@ -603,6 +647,32 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
                 gpu_list.push_back(gpu.c_str());
             ImGui::Combo(lang.gpu["gpu"].c_str(), &emuenv.cfg.gpu_idx, gpu_list.data(), static_cast<int>(gpu_list.size()));
             SetTooltipEx(lang.gpu["select_gpu"].c_str());
+
+#ifdef __ANDROID__
+            if (emuenv.renderer->support_custom_drivers()) {
+                if (emuenv.cfg.gpu_idx == 0)
+                    config.custom_driver_name = "";
+
+                if (ImGui::Button("Add custom driver")) {
+                    app::add_custom_driver(emuenv);
+                    // also set it to stock after
+                    emuenv.cfg.gpu_idx = 0;
+                }
+
+                // first is the stock gpu
+                if (emuenv.cfg.gpu_idx > 0) {
+                    config.custom_driver_name = gpu_list_str[emuenv.cfg.gpu_idx];
+
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove custom driver")) {
+                        app::remove_custom_driver(emuenv, config.custom_driver_name);
+                        // set back to stock
+                        emuenv.cfg.gpu_idx = 0;
+                        config.custom_driver_name = "";
+                    }
+                }
+            }
+#endif
 
             if (is_ingame)
                 ImGui::BeginDisabled();
@@ -614,18 +684,25 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
 
             if (is_ingame)
                 ImGui::EndDisabled();
-        } else {
+        } else if (!is_vulkan) {
             ImGui::Checkbox(lang.gpu["v_sync"].c_str(), &config.v_sync);
             SetTooltipEx(lang.gpu["v_sync_description"].c_str());
             ImGui::SameLine();
         }
+        bool has_surface_sync = !is_vulkan || (emuenv.renderer->supported_mapping_methods_mask > 1);
+#ifdef __ANDROID__
+        has_surface_sync &= is_vulkan;
+#endif
 
         const bool has_integer_multiplier = static_cast<int>(config.resolution_multiplier * 4.0f) % 4 == 0;
         // OpenGL does not support surface sync with a non-integer resolution multiplier
         if (!is_vulkan && !has_integer_multiplier)
+            has_surface_sync = false;
+
+        if (!has_surface_sync)
             config.disable_surface_sync = true;
 
-        if ((!is_vulkan && has_integer_multiplier) || emuenv.renderer->features.support_memory_mapping) {
+        if (has_surface_sync) {
             // surface sync is supported on vulkan only when memory mapping is enabled
             ImGui::Checkbox(lang.gpu["disable_surface_sync"].c_str(), &config.disable_surface_sync);
             SetTooltipEx(lang.gpu["surface_sync_description"].c_str());
@@ -762,11 +839,76 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
         if (ImGui::Combo(lang.gpu["texture_exporting_format"].c_str(), &export_format_pos, export_formats, IM_ARRAYSIZE(export_formats)))
             config.export_as_png = export_format_pos == 0;
 
+        // FPS hack
+        ImGui::Checkbox(lang.gpu["fps_hack"].c_str(), &config.fps_hack);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("%s", lang.gpu["fps_hack_description"].c_str());
+        }
+
+        if (emuenv.renderer->supported_mapping_methods_mask > 1 && !is_renderer_changed) {
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            if (is_ingame)
+                ImGui::BeginDisabled();
+
+            std::vector<const char *> mapping_methods_strings = {
+                "Disabled",
+                "Double buffer",
+                "External host",
+                "Page table",
+                "Native buffer"
+            };
+            std::vector<std::string_view> mapping_methods_indexes = {
+                "disabled",
+                "double-buffer",
+                "external-host",
+                "page-table",
+                "native-buffer"
+            };
+
+            // only get the mapping methods that are available on this GPU
+            int list_pos = 0;
+            for (int i = 0; i < 5; i++) {
+                if ((1 << i) & emuenv.renderer->supported_mapping_methods_mask) {
+                    list_pos++;
+                } else {
+                    mapping_methods_strings.erase(mapping_methods_strings.begin() + list_pos);
+                    mapping_methods_indexes.erase(mapping_methods_indexes.begin() + list_pos);
+                }
+            }
+
+            static int current_mapping = std::find(mapping_methods_indexes.begin(), mapping_methods_indexes.end(), config.memory_mapping) - mapping_methods_indexes.begin();
+            if (ImGui::Combo(lang.gpu["mapping_method"].c_str(), &current_mapping, mapping_methods_strings.data(), mapping_methods_strings.size())) {
+                config.memory_mapping = mapping_methods_indexes[current_mapping];
+            }
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("%s", lang.gpu["mapping_method_description"].c_str());
+            }
+
+            if (is_ingame)
+                ImGui::EndDisabled();
+        }
+
+#ifdef __ANDROID__
+        if (emuenv.renderer->support_custom_drivers()) {
+            ImGui::Spacing();
+            ImGui::Checkbox("Enable Turbo Mode", &emuenv.cfg.turbo_mode);
+
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Provides a way to force the GPU to run at the maximum possible clocks (thermal constraints will still be applied)");
+            }
+        }
+#endif
+
         // Shaders
         TextColoredCentered(GUI_COLOR_TEXT_TITLE, lang.gpu["shaders"].c_str());
         ImGui::Spacing();
-        ImGui::Checkbox(lang.gpu["shader_cache"].c_str(), &emuenv.cfg.shader_cache);
-        SetTooltipEx(lang.gpu["shader_cache_description"].c_str());
+        if (!is_vulkan) {
+            ImGui::Checkbox(lang.gpu["shader_cache"].c_str(), &emuenv.cfg.shader_cache);
+            SetTooltipEx(lang.gpu["shader_cache_description"].c_str());
+        }
         if (emuenv.renderer->features.spirv_shader) {
             ImGui::SameLine();
             ImGui::Checkbox(lang.gpu["spirv_shader"].c_str(), &emuenv.cfg.spirv_shader);
@@ -781,10 +923,6 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
                 fs::remove_all(emuenv.log_path / "shaderlog");
             }
         }
-
-        // FPS hack
-        ImGui::Checkbox(lang.gpu["fps_hack"].c_str(), &config.fps_hack);
-        SetTooltipEx(lang.gpu["fps_hack_description"].c_str());
 
         ImGui::EndTabItem();
     } else
@@ -842,8 +980,10 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
     ImGui::PushStyleColor(ImGuiCol_Text, GUI_COLOR_TEXT_MENUBAR);
     if (ImGui::BeginTabItem(lang.emulator["title"].c_str())) {
         ImGui::PopStyleColor();
+#ifndef __ANDROID__
         ImGui::Spacing();
         ImGui::Checkbox(lang.emulator["boot_apps_full_screen"].c_str(), &emuenv.cfg.boot_apps_full_screen);
+#endif
         ImGui::Spacing();
 
         const char *LIST_LOG_LEVEL[] = { lang.emulator["trace"].c_str(), gui.lang.main_menubar.debug["title"].c_str(), lang.emulator["info"].c_str(), lang.emulator["warning"].c_str(), lang.emulator["error"].c_str(), lang.emulator["critical"].c_str(), lang.emulator["off"].c_str() };
@@ -872,6 +1012,9 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
         ImGui::Spacing();
         ImGui::Checkbox(lang.emulator["check_for_updates"].c_str(), &emuenv.cfg.check_for_updates);
         SetTooltipEx(lang.emulator["check_for_updates_description"].c_str());
+        ImGui::Spacing();
+        ImGui::SliderInt("File Loading Delay", &config.file_loading_delay, 0, 30, "%d ms", ImGuiSliderFlags_AlwaysClamp);
+        SetTooltipEx("File loading delay in milliseconds.\nThis is required for some games to load files too quickly compared to real hardware (e.g., Silent Hill).\nDefault is 0 ms.");
         ImGui::Separator();
         TextColoredCentered(GUI_COLOR_TEXT_TITLE, lang.emulator["performance_overlay"].c_str());
         ImGui::Spacing();
@@ -914,6 +1057,10 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
             SetTooltipEx(lang.emulator["reset_emu_path_description"].c_str());
         }
         ImGui::Spacing();
+#ifdef __ANDROID__
+        ImGui::TextColored(GUI_COLOR_TEXT, "%s", "Using a different path requires additional permissions");
+        ImGui::Spacing();
+#endif
         ImGui::Separator();
         TextColoredCentered(GUI_COLOR_TEXT_TITLE, lang.emulator["custom_config_settings"].c_str());
         ImGui::Spacing();
@@ -926,7 +1073,7 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
         ImGui::Separator();
         TextColoredCentered(GUI_COLOR_TEXT_TITLE, lang.emulator["screenshot_image_type"].c_str());
         ImGui::Spacing();
-        const char *LIST_IMG_FORMAT[] = { "NULL", "JPEG", "PNG" };
+        const char *LIST_IMG_FORMAT[] = { lang.emulator["null"].c_str(), "JPEG", "PNG" };
         ImGui::Combo(lang.emulator["screenshot_format"].c_str(), &emuenv.cfg.screenshot_format, LIST_IMG_FORMAT, IM_ARRAYSIZE(LIST_IMG_FORMAT));
         ImGui::EndTabItem();
     } else
@@ -976,6 +1123,9 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
         ImGui::Spacing();
         ImGui::Checkbox(lang.gui["apps_list_grid"].c_str(), &emuenv.cfg.apps_list_grid);
         SetTooltipEx(lang.gui["apps_list_grid_description"].c_str());
+        ImGui::SameLine();
+        ImGui::Checkbox(lang.gui["fullscreen_hd_res_pixel_perfect"].c_str(), &config.fullscreen_hd_res_pixel_perfect);
+        SetTooltipEx(lang.gui["fullscreen_hd_res_pixel_perfect_description"].c_str());
         if (!emuenv.cfg.apps_list_grid) {
             ImGui::Spacing();
             ImGui::SliderInt(lang.gui["icon_size"].c_str(), &emuenv.cfg.icon_size, 64, 128);
@@ -991,7 +1141,7 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
             SetTooltipEx(lang.gui["asia_font_support_description"].c_str());
         } else {
             ImGui::TextColored(GUI_COLOR_TEXT, "%s", firmware_font["no_font_exist"].c_str());
-            if (ImGui::Button(firmware_font["download_firmware_font_package"].c_str()))
+            if (ImGui::Button(gui.lang.welcome["download_firmware_font_package"].c_str()))
                 open_path("https://bit.ly/2P2rb0r");
             SetTooltipEx(lang.gui["firmware_font_package_description"].c_str());
         }
@@ -1070,6 +1220,39 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
         ImGui::Spacing();
         ImGui::Checkbox(lang.network["psn_signed_in"].c_str(), &config.psn_signed_in);
         SetTooltipEx(lang.network["psn_signed_in_description"].c_str());
+
+        // Adhoc
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        TextColoredCentered(GUI_COLOR_TEXT_MENUBAR, "Adhoc");
+        ImGui::Spacing();
+
+        std::vector<std::string> addrsStrings;
+        std::vector<const char *> addrsSelect;
+        std::vector<const char *> nMaskSelect;
+        const auto addrs = net_utils::get_all_assigned_addrs();
+
+        for (const auto &addr : addrs) {
+            addrsStrings.emplace_back(fmt::format("{} ({})", addr.addr, addr.name).c_str());
+            addrsSelect.emplace_back(addrsStrings.back().c_str());
+            nMaskSelect.emplace_back(addr.netMask.c_str());
+        }
+
+        if (emuenv.cfg.adhoc_addr >= addrs.size()) {
+            emuenv.cfg.adhoc_addr = 0;
+            LOG_WARN("Invalid adhoc address index {}, resetting to 0", emuenv.cfg.adhoc_addr);
+            save_config(gui, emuenv);
+        }
+
+        ImGui::PushItemWidth(ImGui::CalcTextSize(addrsStrings[emuenv.cfg.adhoc_addr].c_str()).x + (30.f * SCALE.x));
+        ImGui::Combo(lang.network["ip_address"].c_str(), &emuenv.cfg.adhoc_addr, addrsSelect.data(), static_cast<int>(addrsSelect.size()));
+        SetTooltipEx(lang.network["ip_address_description"].c_str());
+
+        ImGui::BeginDisabled();
+        ImGui::Combo(lang.network["subnet_mask"].c_str(), &emuenv.cfg.adhoc_addr, nMaskSelect.data(), static_cast<int>(nMaskSelect.size()));
+        ImGui::EndDisabled();
+        ImGui::PopItemWidth();
 
         // HTTP
         ImGui::Spacing();
@@ -1184,7 +1367,7 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
                 // Create selectable item using module name and get activation state
                 if (ImGui::Selectable(module.c_str(), activation_state)) {
                     // Change activation state if module is clicked/selected
-                    if (activation_state == true) {
+                    if (activation_state) {
                         // Deactivate module
                         tracy_module_utils::set_tracy_active(module, false);
                         // Update config data by deleting the name of the module from the vector
@@ -1212,18 +1395,25 @@ void draw_settings_dialog(GuiState &gui, EmuEnvState &emuenv) {
     ImGui::Spacing();
     static const auto BUTTON_SIZE = ImVec2(120.f * SCALE.x, 0.f);
     ImGui::SetCursorPosX((ImGui::GetWindowSize().x / 2.f) - BUTTON_SIZE.x - (10.f * SCALE.x));
-    if (ImGui::Button(common["close"].c_str(), BUTTON_SIZE))
+    if (ImGui::Button(common.common["close"].c_str(), BUTTON_SIZE))
         show_settings_dialog = false;
     ImGui::SameLine(0, 20.f * SCALE.x);
     const auto is_apply = !emuenv.io.app_path.empty() && (!is_custom_config || (emuenv.app_path == emuenv.io.app_path));
-    const auto is_reboot = (emuenv.renderer->current_backend != emuenv.backend_renderer) || (config.resolution_multiplier != emuenv.cfg.current_config.resolution_multiplier);
-    if (ImGui::Button(is_apply ? (is_reboot ? lang.main_window["save_reboot"].c_str() : lang.main_window["save_apply"].c_str()) : lang.main_window["save"].c_str(), BUTTON_SIZE)) {
+    const auto is_reboot = !emuenv.io.app_path.empty()
+        && ((emuenv.renderer->current_backend != emuenv.backend_renderer)
+#ifdef __ANDROID__
+            || (config.custom_driver_name != emuenv.renderer->current_custom_driver)
+#endif
+            || (config.resolution_multiplier != emuenv.renderer->res_multiplier));
+    if (ImGui::Button(is_apply ? (is_reboot ? lang.main_window["save_reboot"].c_str() : lang.main_window["save_apply"].c_str()) : lang.main_window["save_close"].c_str(), BUTTON_SIZE)) {
         save_config(gui, emuenv);
         if (is_apply)
-            set_config(gui, emuenv, emuenv.io.app_path);
+            set_config(emuenv);
+        show_settings_dialog = false;
     }
     SetTooltipEx(lang.main_window["keep_changes"].c_str());
 
+    ImGui::ScrollWhenDragging();
     ImGui::End();
 }
 
